@@ -233,7 +233,7 @@ local function baseConfig()
 		glow = { on = false, color = p.accent, layers = 4, spread = 2, alpha = 0.10, pulse = true, rate = 3 },
 		name = { on = true, user = false, size = 13, color = p.text, font = FONTS.Plex, shadow = true },
 		gun  = { on = false, size = 12, color = rgb(205, 205, 215), ammoAttr = "Ammo" },
-		dist = { on = false, size = 11, color = rgb(180, 180, 190), suffix = "m" },
+		dist = { on = false, size = 13, color = p.text, font = FONTS.Plex, shadow = true, suffix = "m" },
 
 		hp = {
 			on = true, side = "left", thickness = 3, outline = true,
@@ -257,8 +257,7 @@ local function baseConfig()
 		rings = {
 			on = false, onEnemies = false,
 			specs = {
-				{ radius = 14, color = rgb(255, 70, 70), thickness = 2, style = "solid", shape = "circle", fx = "none", spin = 0.4, pulse = false, fill = false, fillAlpha = 0.08, glow = false, ticks = 0 },
-				{ radius = 6,  color = rgb(90, 200, 255), thickness = 2, style = "dashed", shape = "circle", fx = "none", spin = 0, pulse = true, fill = false, fillAlpha = 0.08, glow = false, ticks = 0 },
+				{ radius = 12, color = p.accent, thickness = 2, style = "solid", shape = "circle", fx = "none", spin = 0.4, pulse = false, fill = false, fillAlpha = 0.08, glow = true, ticks = 0 },
 			},
 		},
 		ball = { on = false, onEnemies = false, radius = 10, rings = 5, color = p.accent, thickness = 1, alpha = 0.6, spin = 0.2, fx = "none" },
@@ -658,6 +657,28 @@ end
 
 function ESP:detachRing(id) self.selfRings[id] = nil end
 function ESP:clearRings() self.selfRings = {} end
+
+local RING_SPEC_DEFAULTS = {
+	radius = 8, color = rgb(190, 70, 235), thickness = 2, alpha = 1,
+	style = "solid", shape = "circle", fx = "none", spin = 0,
+	pulse = false, fill = false, fillAlpha = 0.08, glow = false, ticks = 0,
+}
+
+function ESP:addRingSpec(opt)
+	local spec = deepClone(RING_SPEC_DEFAULTS)
+	if opt then merge(spec, opt) end
+	insert(self.cfg.rings.specs, spec)
+	return spec
+end
+
+function ESP:removeRingSpec(idx)
+	remove(self.cfg.rings.specs, idx or #self.cfg.rings.specs)
+end
+
+function ESP:clearRingSpecs()
+	local specs = self.cfg.rings.specs
+	for i = #specs, 1, -1 do specs[i] = nil end
+end
 
 function ESP:centerOf(target)
 	if target == nil then
@@ -1188,7 +1209,10 @@ function ESP:drawPlayer(plr, rig, root, hum, head, lx, ly, bw, bh, dist, visible
 		end
 	end
 	if cfg.dist.on then
-		self.pool:text(key .. "d", floor(dist) .. cfg.dist.suffix, mid, below, cfg.dist.size, cfg.dist.color, true, FONTS.Plex, false)
+		local d = cfg.dist
+		local label = floor(dist) .. d.suffix
+		if d.shadow then self.pool:text(key .. "dsh", label, mid + 1, below + 1, d.size, BLACK, true, d.font, false) end
+		self.pool:text(key .. "d", label, mid, below, d.size, cfg.wallColors and accent or d.color, true, d.font, true)
 	end
 
 	if cfg.flags.on then
