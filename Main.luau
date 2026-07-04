@@ -199,6 +199,7 @@ local function baseConfig()
 	return {
 		enabled  = false,
 		maxRange = 3000,
+		espRange = 3000,
 		refresh  = 0,
 		teamCheck   = false,
 		wallCheck   = false,
@@ -216,7 +217,6 @@ local function baseConfig()
 			near       = 120,
 			mid        = 320,
 			far        = 700,
-			labelsOnlyFar = true,
 			dropFxFar  = true,
 			frameSkip  = 0,
 		},
@@ -233,7 +233,7 @@ local function baseConfig()
 		glow = { on = false, color = p.accent, layers = 4, spread = 2, alpha = 0.10, pulse = true, rate = 3 },
 		name = { on = true, user = false, size = 13, color = p.text, font = FONTS.Plex, shadow = true },
 		gun  = { on = false, size = 12, color = rgb(205, 205, 215), ammoAttr = "Ammo" },
-		dist = { on = false, size = 11, color = rgb(180, 180, 190), suffix = "m", outline = false },
+		dist = { on = false, size = 11, color = rgb(180, 180, 190), suffix = "m" },
 
 		hp = {
 			on = true, side = "left", thickness = 3, outline = true,
@@ -1050,7 +1050,6 @@ function ESP:drawPlayer(plr, rig, root, hum, head, lx, ly, bw, bh, dist, visible
 	local cfg = self.cfg
 	local key = "p" .. plr.UserId
 	local mid = lx + bw / 2
-	local labelsOnly = lod >= 3 and cfg.perf.labelsOnlyFar and cfg.perf.mode ~= "off"
 
 	local box = cfg.box
 	local accent = cfg.rainbow and hueAt(self.clock * cfg.rainbowRate * 0.1) or box.color
@@ -1059,7 +1058,7 @@ function ESP:drawPlayer(plr, rig, root, hum, head, lx, ly, bw, bh, dist, visible
 	elseif box.colorMode == "health" and hum.MaxHealth > 0 then
 		accent = box.healthLow:Lerp(box.healthFull, clamp(hum.Health / hum.MaxHealth, 0, 1))
 	elseif box.colorMode == "distance" then
-		accent = box.healthFull:Lerp(box.healthLow, clamp(dist / cfg.maxRange, 0, 1))
+		accent = box.healthFull:Lerp(box.healthLow, clamp(dist / cfg.espRange, 0, 1))
 	end
 	if cfg.wallColors and visible ~= nil then
 		accent = visible and cfg.visible or cfg.hidden
@@ -1078,7 +1077,7 @@ function ESP:drawPlayer(plr, rig, root, hum, head, lx, ly, bw, bh, dist, visible
 		accent = accent:Lerp(cfg.hit.flash, 1 - (self.clock - hit.at) / cfg.hit.life)
 	end
 
-	if not labelsOnly then
+	do
 		if cfg.glow.on then
 			local g = cfg.glow
 			local beat = g.pulse and (0.5 + 0.5 * sin(self.clock * g.rate)) or 1
@@ -1167,7 +1166,7 @@ function ESP:drawPlayer(plr, rig, root, hum, head, lx, ly, bw, bh, dist, visible
 		local n = cfg.name
 		local label
 		if n.on and n.user then
-			label = plr.DisplayName .. " (" .. plr.Name .. ")"
+			label = plr.DisplayName .. "(" .. plr.Name .. ")"
 		elseif n.user then
 			label = plr.Name
 		else
@@ -1189,10 +1188,10 @@ function ESP:drawPlayer(plr, rig, root, hum, head, lx, ly, bw, bh, dist, visible
 		end
 	end
 	if cfg.dist.on then
-		self.pool:text(key .. "d", floor(dist) .. cfg.dist.suffix, mid, below, cfg.dist.size, cfg.dist.color, true, FONTS.Plex, cfg.dist.outline)
+		self.pool:text(key .. "d", floor(dist) .. cfg.dist.suffix, mid, below, cfg.dist.size, cfg.dist.color, true, FONTS.Plex, false)
 	end
 
-	if cfg.flags.on and not labelsOnly then
+	if cfg.flags.on then
 		self:drawFlags(key, lx, ly, bw, { plr = plr, rig = rig, root = root, hum = hum, head = head, dist = dist, visible = visible, esp = self })
 	end
 
@@ -1201,7 +1200,7 @@ function ESP:drawPlayer(plr, rig, root, hum, head, lx, ly, bw, bh, dist, visible
 		self.pool:text(key .. "dm", "-" .. hit.dmg, mid + 20, ly + bh * 0.3 - prog * 15, 13, cfg.hit.dmgColor, true, FONTS.Plex, true)
 	end
 
-	if not labelsOnly then
+	do
 		local foot = self:footOf(root, hum)
 		if cfg.rings.on and cfg.rings.onEnemies then
 			for i, spec in ipairs(cfg.rings.specs) do
@@ -1751,6 +1750,7 @@ end
 
 function ESP:collectRoster()
 	local eye = cam.CFrame.Position
+	local reach = math.max(self.cfg.espRange, self.cfg.maxRange)
 	local roster, n = self.roster, 0
 	for _, plr in ipairs(Players:GetPlayers()) do
 		if plr ~= me then
@@ -1763,7 +1763,7 @@ function ESP:collectRoster()
 				if self.mat[plr.UserId] then self:dropMatCham(plr.UserId) end
 			else
 				local dist = (eye - root.Position).Magnitude
-				if dist <= self.cfg.maxRange then
+				if dist <= reach then
 					n = n + 1
 					local slot = roster[n]
 					if slot then
@@ -1836,7 +1836,7 @@ function ESP:tick(dt)
 		local skip = (cfg.teamCheck and self:isAlly(plr)) or (cfg.wallHide and visible == false)
 		if not skip and (cap == 0 or shown < cap) then
 			local sx, sy, depth, onScreen = self:project(root.Position)
-			if onScreen and depth > 0 then
+			if onScreen and depth > 0 and dist <= cfg.espRange then
 				local lx, ly, bw, bh = self:screenBox(rig)
 				if lx then
 					if bw < 4 then bw = 4 end
