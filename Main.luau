@@ -33,22 +33,15 @@ EasyESP.Defaults = {
         Usernames = false,
         Distance = false,
         Tool = false,
-        Rank = false,
-        Flags = false,
         TextSize = 13,
         TextColor = Color3.fromRGB(255, 255, 255),
         TextOutline = true,
         HealthBar = false,
         HealthBarGradient = true,
-        ArmorBar = false,
-        ArmorColor = Color3.fromRGB(0, 180, 255),
-        StaminaBar = false,
-        StaminaColor = Color3.fromRGB(255, 255, 0),
         BarThickness = 2,
-        BarOutline = true,
+        BarOutline = false,
         Skeletons = false,
         SkeletonColor = Color3.fromRGB(255, 255, 255),
-        HeadSkeleton = false,
         HeadDot = false,
         HeadDotSize = 3,
         LookLines = false,
@@ -57,10 +50,6 @@ EasyESP.Defaults = {
         Tracers = false,
         TracerOrigin = "Bottom",
         TracerColor = Color3.fromRGB(255, 255, 255),
-
-        Inventory = false,
-        Hotbar = false,
-        MaxItems = 5,
 
         Arrows = false,
         ArrowRadius = 200,
@@ -128,14 +117,6 @@ function EasyESP.new()
         RainbowVal = 0
     }
 
-    self.GetArmor = function(plr) return 0 end
-    self.GetMaxArmor = function(plr) return 100 end
-    self.GetStamina = function(plr) return 0 end
-    self.GetMaxStamina = function(plr) return 100 end
-    self.GetInventory = function(plr) return {} end
-    self.GetHotbar = function(plr) return {} end
-    self.GetRank = function(plr) return "None" end
-    self.GetFlags = function(plr) return {} end
     self.GetTool = function(plr)
         local char = plr.Character
         local tool = char and char:FindFirstChildOfClass("Tool")
@@ -303,16 +284,16 @@ function EasyESP:RenderTracer(id, target, color)
     line.Thickness = 1
 end
 
-function EasyESP:RenderBar(id, boxX, boxY, boxH, pct, color, offset)
+function EasyESP:RenderHealthBar(id, boxX, boxY, boxH, pct, color)
     local s = self.Settings.ESP
     local barW = s.BarThickness
-    local xPos = boxX - 5 - (offset * (barW + 3))
+    local xPos = boxX - 5 - barW
     local barH = boxH
 
     pct = math.clamp(pct, 0, 1)
 
     if s.BarOutline then
-        local out = self:GetDrawing(id .. "_baro_" .. offset, "Square")
+        local out = self:GetDrawing(id .. "_baro", "Square")
         out.Visible = true
         out.Filled = true
         out.Color = Color3.new(0, 0, 0)
@@ -322,7 +303,7 @@ function EasyESP:RenderBar(id, boxX, boxY, boxH, pct, color, offset)
     end
 
     -- Background
-    local bg = self:GetDrawing(id .. "_barbg_" .. offset, "Square")
+    local bg = self:GetDrawing(id .. "_barbg", "Square")
     bg.Visible = true
     bg.Filled = true
     bg.Color = Color3.new(0.15, 0.15, 0.15)
@@ -332,61 +313,13 @@ function EasyESP:RenderBar(id, boxX, boxY, boxH, pct, color, offset)
 
     -- Fill
     local fillH = barH * pct
-    local main = self:GetDrawing(id .. "_bar_" .. offset, "Square")
+    local main = self:GetDrawing(id .. "_bar", "Square")
     main.Visible = true
     main.Filled = true
     main.Color = color
     main.Transparency = 1
     main.Position = Vector2.new(xPos, boxY + (barH - fillH))
     main.Size = Vector2.new(barW, math.max(fillH, 1))
-end
-
-function EasyESP:RenderList(id, x, y, items, title)
-    if #items == 0 then return 0 end
-    local s = self.Settings.ESP
-    local fontSize = math.max(s.TextSize - 2, 10)
-    local lineHeight = fontSize + 2
-    local totalHeight = 0
-
-    -- Title
-    local titleTxt = self:GetDrawing(id .. "_lt_" .. title, "Text")
-    titleTxt.Visible = true
-    titleTxt.Size = fontSize
-    titleTxt.Font = 2
-    titleTxt.Color = Color3.fromRGB(200, 200, 200)
-    titleTxt.Outline = true
-    titleTxt.OutlineColor = Color3.new(0, 0, 0)
-    titleTxt.Text = title .. ":"
-    titleTxt.Position = Vector2.new(x, y + totalHeight)
-    totalHeight = totalHeight + lineHeight
-
-    for i = 1, math.min(#items, s.MaxItems) do
-        local itemTxt = self:GetDrawing(id .. "_li_" .. title .. "_" .. i, "Text")
-        itemTxt.Visible = true
-        itemTxt.Size = fontSize
-        itemTxt.Font = 2
-        itemTxt.Color = Color3.fromRGB(255, 255, 255)
-        itemTxt.Outline = true
-        itemTxt.OutlineColor = Color3.new(0, 0, 0)
-        itemTxt.Text = "  " .. tostring(items[i])
-        itemTxt.Position = Vector2.new(x, y + totalHeight)
-        totalHeight = totalHeight + lineHeight
-    end
-
-    if #items > s.MaxItems then
-        local moreTxt = self:GetDrawing(id .. "_lm_" .. title, "Text")
-        moreTxt.Visible = true
-        moreTxt.Size = fontSize - 1
-        moreTxt.Font = 2
-        moreTxt.Color = Color3.fromRGB(150, 150, 150)
-        moreTxt.Outline = true
-        moreTxt.OutlineColor = Color3.new(0, 0, 0)
-        moreTxt.Text = "  +" .. (#items - s.MaxItems) .. " more"
-        moreTxt.Position = Vector2.new(x, y + totalHeight)
-        totalHeight = totalHeight + lineHeight
-    end
-
-    return totalHeight + 4
 end
 
 function EasyESP:UpdateWorld()
@@ -598,7 +531,7 @@ function EasyESP:Start()
                     end
 
                     -- ========================
-                    -- LOOK LINES (fixed length)
+                    -- LOOK LINES
                     -- ========================
                     if s.LookLines and head then
                         local headScreen, headDepth, headOn = self:W2S(head.Position)
@@ -624,31 +557,16 @@ function EasyESP:Start()
                     end
 
                     -- ========================
-                    -- BARS (left side, properly scaled)
+                    -- HEALTH BAR
                     -- ========================
-                    local barIndex = 0
                     if s.HealthBar then
                         local pct = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
                         local barColor = s.HealthBarGradient and Color3.fromHSV(pct * 0.3, 1, 1) or Color3.new(0, 1, 0)
-                        self:RenderBar(id, bx, by, bh, pct, barColor, barIndex)
-                        barIndex = barIndex + 1
-                    end
-                    if s.ArmorBar then
-                        local maxArmor = self.GetMaxArmor(plr)
-                        local curArmor = self.GetArmor(plr)
-                        local pct = maxArmor > 0 and math.clamp(curArmor / maxArmor, 0, 1) or 0
-                        self:RenderBar(id, bx, by, bh, pct, s.ArmorColor, barIndex)
-                        barIndex = barIndex + 1
-                    end
-                    if s.StaminaBar then
-                        local maxStamina = self.GetMaxStamina(plr)
-                        local curStamina = self.GetStamina(plr)
-                        local pct = maxStamina > 0 and math.clamp(curStamina / maxStamina, 0, 1) or 0
-                        self:RenderBar(id, bx, by, bh, pct, s.StaminaColor, barIndex)
+                        self:RenderHealthBar(id, bx, by, bh, pct, barColor)
                     end
 
                     -- ========================
-                    -- TEXT ABOVE (names, rank)
+                    -- TEXT ABOVE (names)
                     -- ========================
                     local topY = by - 4
                     local fontSize = math.clamp(s.TextSize, 10, 24)
@@ -667,16 +585,8 @@ function EasyESP:Start()
                         self:MakeText(id .. "_n", str, Vector2.new(centerX, topY), fontSize, textColor, true, 2)
                     end
 
-                    if s.Rank then
-                        local rankStr = self.GetRank(plr)
-                        if rankStr and rankStr ~= "" and rankStr ~= "None" then
-                            topY = topY - (fontSize - 1)
-                            self:MakeText(id .. "_rank", "[" .. rankStr .. "]", Vector2.new(centerX, topY), fontSize - 2, Color3.fromRGB(255, 200, 100), true, 2)
-                        end
-                    end
-
                     -- ========================
-                    -- TEXT BELOW (distance, tool, flags)
+                    -- TEXT BELOW (distance, tool)
                     -- ========================
                     local botY = by + bh + 3
 
@@ -691,27 +601,6 @@ function EasyESP:Start()
                             self:MakeText(id .. "_t", toolName, Vector2.new(centerX, botY), fontSize - 2, Color3.fromRGB(180, 220, 255), true, 2)
                             botY = botY + (fontSize - 1)
                         end
-                    end
-
-                    if s.Flags then
-                        local flags = self.GetFlags(plr)
-                        if #flags > 0 then
-                            self:MakeText(id .. "_f", table.concat(flags, " | "), Vector2.new(centerX, botY), fontSize - 3, Color3.fromRGB(255, 80, 80), true, 2)
-                            botY = botY + (fontSize - 2)
-                        end
-                    end
-
-                    -- ========================
-                    -- LISTS (right side)
-                    -- ========================
-                    local listX = bx + bw + 6
-                    local listY = by
-
-                    if s.Hotbar then
-                        listY = listY + self:RenderList(id, listX, listY, self.GetHotbar(plr), "Hotbar")
-                    end
-                    if s.Inventory then
-                        self:RenderList(id, listX, listY, self.GetInventory(plr), "Inventory")
                     end
                 end
 
