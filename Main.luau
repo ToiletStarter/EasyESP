@@ -226,6 +226,9 @@ local function baseConfig()
 			color = p.accent, thickness = 1,
 			outline = true, cornerScale = 0.28,
 			fill = false, fillColor = p.accent, fillAlpha = 0.12,
+			colorMode = "static",
+			healthFull = rgb(90, 235, 120), healthLow = rgb(235, 70, 70),
+			distanceFade = false, fadeStart = 150, fadeEnd = 600,
 		},
 		glow = { on = false, color = p.accent, layers = 4, spread = 2, alpha = 0.10, pulse = true, rate = 3 },
 		name = { on = true, size = 13, color = p.text, font = FONTS.Plex, shadow = true, showUser = false },
@@ -539,36 +542,48 @@ function ESP:worldBall(key, cx, cy, cz, radius, bands, sides, color, thick, alph
 	sides = clamp(floor(sides), 6, 64)
 	bands = clamp(floor(bands), 2, 16)
 	local origin = v3(cx, cy, cz)
-	local n = 0
-	local function span(pa, pb)
-		if pa and pa[3] > 0 and pb[3] > 0 then
-			n = n + 1
-			self.pool:line(key .. n, pa[1], pa[2], pb[1], pb[2], color, thick, alpha)
-		end
-	end
-	for r = 1, bands do
-		local frac = r / (bands + 1)
-		local y = (frac - 0.5) * 2 * radius
-		local rr = sqrt(math.max(radius * radius - y * y, 0))
-		local prev
+
+	local ring = self._ballTrig
+	if not ring or ring.n ~= sides or ring.spin ~= spin then
+		ring = { n = sides, spin = spin, c = {}, s = {} }
 		for i = 0, sides do
 			local a = (i / sides) * TAU + spin
-			local x, yy, d = self:project(origin + v3(cos(a) * rr, y, sin(a) * rr))
-			local cur = { x, yy, d }
-			if prev then span(prev, cur) end
-			prev = cur
+			ring.c[i], ring.s[i] = cos(a), sin(a)
+		end
+		self._ballTrig = ring
+	end
+	local rc, rs = ring.c, ring.s
+
+	local n = 0
+	local px, py, pd
+	for b = 1, bands do
+		local frac = b / (bands + 1)
+		local y = (frac - 0.5) * 2 * radius
+		local rr = sqrt(math.max(radius * radius - y * y, 0))
+		px = nil
+		for i = 0, sides do
+			local x, yy, d = self:project(origin + v3(rc[i] * rr, y, rs[i] * rr))
+			if px and pd > 0 and d > 0 then
+				n = n + 1
+				self.pool:line(key .. n, px, py, x, yy, color, thick, alpha)
+			end
+			px, py, pd = x, yy, d
 		end
 	end
+
 	local mer = math.max(4, floor(sides / 4))
 	for m = 0, mer - 1 do
-		local ang = (m / mer) * pi + spin
-		local prev
+		local ma = (m / mer) * pi + spin
+		local mcx, mcz = cos(ma), sin(ma)
+		px = nil
 		for i = 0, sides do
-			local t = (i / sides) * TAU
-			local x, yy, d = self:project(origin + v3(cos(t) * radius * cos(ang), sin(t) * radius, cos(t) * radius * sin(ang)))
-			local cur = { x, yy, d }
-			if prev then span(prev, cur) end
-			prev = cur
+			local ringR = rc[i] * radius
+			local x, yy, d = self:project(origin + v3(ringR * mcx, rs[i] * radius, ringR * mcz))
+			if px and pd > 0 and d > 0 then
+				n = n + 1
+				self.pool:line(key .. n, px, py, x, yy, color, thick, alpha)
+			end
+			px, py, pd = x, yy, d
 		end
 	end
 end
@@ -1039,12 +1054,25 @@ function ESP:drawPlayer(plr, rig, root, hum, head, lx, ly, bw, bh, dist, visible
 	local mid = lx + bw / 2
 	local labelsOnly = lod >= 3 and cfg.perf.labelsOnlyFar and cfg.perf.mode ~= "off"
 
-	local accent = cfg.rainbow and hueAt(self.clock * cfg.rainbowRate * 0.1) or cfg.box.color
+	local box = cfg.box
+	local accent = cfg.rainbow and hueAt(self.clock * cfg.rainbowRate * 0.1) or box.color
+	if box.colorMode == "team" and plr.Team then
+		accent = plr.TeamColor and plr.TeamColor.Color or accent
+	elseif box.colorMode == "health" and hum.MaxHealth > 0 then
+		accent = box.healthLow:Lerp(box.healthFull, clamp(hum.Health / hum.MaxHealth, 0, 1))
+	elseif box.colorMode == "distance" then
+		accent = box.healthFull:Lerp(box.healthLow, clamp(dist / cfg.maxRange, 0, 1))
+	end
 	if cfg.wallColors and visible ~= nil then
 		accent = visible and cfg.visible or cfg.hidden
 	end
 	if cfg.pulse.on and hum.MaxHealth > 0 and hum.Health / hum.MaxHealth <= cfg.pulse.threshold then
 		accent = accent:Lerp(cfg.pulse.color, 0.5 + 0.5 * sin(self.clock * cfg.pulse.rate))
+	end
+
+	local boxFade = 1
+	if box.distanceFade then
+		boxFade = 1 - clamp((dist - box.fadeStart) / math.max(box.fadeEnd - box.fadeStart, 1), 0, 0.85)
 	end
 
 	local hit = self.hits[plr.UserId]
@@ -1079,14 +1107,14 @@ function ESP:drawPlayer(plr, rig, root, hum, head, lx, ly, bw, bh, dist, visible
 				}
 				for i = 1, 8 do
 					local o = (i - 1) * 4
-					if b.outline then self.pool:line(key .. "co" .. i, seg[o+1], seg[o+2], seg[o+3], seg[o+4], BLACK, b.thickness + 2) end
-					self.pool:line(key .. "c" .. i, seg[o+1], seg[o+2], seg[o+3], seg[o+4], accent, b.thickness)
+					if b.outline then self.pool:line(key .. "co" .. i, seg[o+1], seg[o+2], seg[o+3], seg[o+4], BLACK, b.thickness + 2, boxFade) end
+					self.pool:line(key .. "c" .. i, seg[o+1], seg[o+2], seg[o+3], seg[o+4], accent, b.thickness, boxFade)
 				end
 			else
-				if b.outline then self.pool:rect(key .. "bo", lx - 1, ly - 1, bw + 2, bh + 2, BLACK, false, b.thickness + 2) end
-				self.pool:rect(key .. "b", lx, ly, bw, bh, accent, false, b.thickness)
+				if b.outline then self.pool:rect(key .. "bo", lx - 1, ly - 1, bw + 2, bh + 2, BLACK, false, b.thickness + 2, boxFade) end
+				self.pool:rect(key .. "b", lx, ly, bw, bh, accent, false, b.thickness, boxFade)
 			end
-			if b.fill then self.pool:rect(key .. "bf", lx, ly, bw, bh, b.fillColor, true, 1, b.fillAlpha) end
+			if b.fill then self.pool:rect(key .. "bf", lx, ly, bw, bh, b.fillColor, true, 1, b.fillAlpha * boxFade) end
 		end
 
 		if cfg.bones.on and lod < 2 then self:drawBones(key, rig, cfg.rainbow and accent or cfg.bones.color, cfg.bones.thickness) end
