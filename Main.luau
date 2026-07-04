@@ -51,12 +51,17 @@ local EDGES = {
 }
 
 
+local function sameColor(a, b)
+	return a == b or (a.R == b.R and a.G == b.G and a.B == b.B)
+end
+
 local Pool = {}
 Pool.__index = Pool
 
 function Pool.new()
 	return setmetatable({
 		bank   = {},
+		shadow = {},
 		live   = {},
 		wasLive= {},
 	}, Pool)
@@ -67,9 +72,10 @@ function Pool:grab(key, kind)
 	if not d then
 		d = Drawing.new(kind)
 		self.bank[key] = d
+		self.shadow[key] = {}
 	end
 	self.live[key] = true
-	return d
+	return d, self.shadow[key]
 end
 
 function Pool:openFrame()
@@ -78,10 +84,13 @@ function Pool:openFrame()
 end
 
 function Pool:closeFrame()
-	local live, was, bank = self.live, self.wasLive, self.bank
+	local live, was, bank, shadow = self.live, self.wasLive, self.bank, self.shadow
 	for k in pairs(was) do
 		if not live[k] then
-			bank[k].Visible = false
+			local d = bank[k]
+			if d then d.Visible = false end
+			local sh = shadow[k]
+			if sh then sh.Visible = false end
 		end
 	end
 	self.wasLive, self.live = live, was
@@ -89,18 +98,20 @@ end
 
 function Pool:nuke()
 	cleardrawcache()
-	self.bank, self.live, self.wasLive = {}, {}, {}
+	self.bank, self.shadow, self.live, self.wasLive = {}, {}, {}, {}
 end
 
 function Pool:line(key, ax, ay, bx, by, color, thick, alpha, z)
-	local d = self:grab(key, "Line")
-	sp(d, "Visible", true)
-	sp(d, "From", v2(ax, ay))
-	sp(d, "To", v2(bx, by))
-	sp(d, "Color", color)
-	sp(d, "Thickness", thick or 1)
-	sp(d, "Transparency", alpha or 1)
-	if z then sp(d, "ZIndex", z) end
+	local d, sh = self:grab(key, "Line")
+	if not sh.Visible then sp(d, "Visible", true) sh.Visible = true end
+	if sh.fx ~= ax or sh.fy ~= ay then sp(d, "From", v2(ax, ay)) sh.fx, sh.fy = ax, ay end
+	if sh.tx ~= bx or sh.ty ~= by then sp(d, "To", v2(bx, by)) sh.tx, sh.ty = bx, by end
+	if not sh.col or not sameColor(sh.col, color) then sp(d, "Color", color) sh.col = color end
+	thick = thick or 1
+	if sh.th ~= thick then sp(d, "Thickness", thick) sh.th = thick end
+	alpha = alpha or 1
+	if sh.a ~= alpha then sp(d, "Transparency", alpha) sh.a = alpha end
+	if z and sh.z ~= z then sp(d, "ZIndex", z) sh.z = z end
 	return d
 end
 
@@ -253,7 +264,7 @@ local function baseConfig()
 			onEnemies = true,
 			confetti  = { on = false, count = 40, radius = 8, height = 12, speed = 6, size = 3, rainbow = true, color = rgb(255, 100, 200) },
 			rain      = { on = false, count = 60, radius = 7, height = 16, speed = 24, length = 1.2, color = rgb(120, 170, 255), alpha = 0.6, rainbow = false },
-			synth     = { on = false, rings = 6, radius = 12, speed = 4, sides = 40, thickness = 1, alpha = 0.7, hue = 0.85, hueSpan = 0.25, rise = true },
+			synth     = { on = false, rings = 6, radius = 12, speed = 4, sides = 40, thickness = 1, alpha = 0.7, hue = 0.85, hueSpan = 0.25, rise = true, glow = true },
 			orbit     = { on = false, count = 3, radius = 5, speed = 2, size = 4, color = p.accent, lift = 3, rainbow = false, trail = true, trailLen = 5 },
 			spiral    = { on = false, radius = 6, height = 10, turns = 3, points = 60, speed = 2, thickness = 1, alpha = 0.85, color = rgb(255, 120, 60), rainbow = true },
 			vortex    = { on = false, count = 50, radius = 8, height = 12, speed = 6, twist = 3, size = 3, color = rgb(120, 80, 255), rainbow = true },
@@ -269,9 +280,13 @@ local function baseConfig()
 			embers    = { on = false, count = 40, radius = 5, height = 12, speed = 5, size = 2 },
 			radar     = { on = false, radius = 14, sides = 40, speed = 2, arc = 1.2, thickness = 2, alpha = 0.8, color = rgb(80, 255, 120) },
 			burst     = { on = false, outer = 6, inner = 2.5, points = 5, spin = 1, thickness = 2, alpha = 0.9, color = rgb(255, 220, 90), rainbow = true },
+			ripple    = { on = false, waves = 4, radius = 12, speed = 3, sides = 44, alpha = 0.18, color = rgb(120, 90, 255) },
+			beam      = { on = false, count = 5, radius = 4, height = 18, speed = 3, thickness = 2, alpha = 0.5, color = rgb(120, 200, 255), rainbow = true },
 		},
 
 		self = {
+			fx      = false,
+			rings   = false,
 			trail   = { on = false, ticks = 30, gap = 0.05, thickness = 2, alpha = 0.8, color = p.accent, rainbow = true },
 			fov     = { on = false, radius = 120, thickness = 1, sides = 64, alpha = 1, color = rawc(1,1,1), rainbow = false, fill = false, fillAlpha = 0.05 },
 			cross   = { on = false, gap = 4, length = 8, thickness = 1, alpha = 1, color = rgb(0, 255, 120), rainbow = false, outline = true, dot = false, dotSize = 1 },
@@ -285,6 +300,7 @@ local function baseConfig()
 			outline = true, outlineColor = rawc(1,1,1), outlineAlpha = 0,
 			material = "ForceField", matColor = rawc(1,1,1), matAlpha = 0, matHead = true,
 			wallColors = false, visible = rgb(0, 255, 0), hidden = rgb(255, 0, 0),
+			rainbow = false, rainbowRate = 1,
 		},
 
 		world = {
@@ -349,9 +365,13 @@ function ESP.new(overrides)
 	self.entities  = {}
 	self.selfRings = {}
 	self.tagHooks  = {}
+	self.modules   = {}
+	self.moduleOrder = {}
+	self._pctx = { esp = self }
 
 	self.hl   = {}
 	self.mat  = {}
+	self.matKind = {}
 	self.hits = {}
 	self.hpMem= {}
 	self.btrk = {}
@@ -661,6 +681,24 @@ function ESP:drawSelfRings()
 	end
 end
 
+function ESP:drawSelfWorld()
+	local s = self.cfg.self
+	if not (s.fx or s.rings) then return end
+	local rig = me.Character
+	local root = rig and rig:FindFirstChild("HumanoidRootPart")
+	if not root then return end
+	local hum = rig:FindFirstChildOfClass("Humanoid")
+	local foot = self:footOf(root, hum)
+	if s.rings then
+		for i, spec in ipairs(self.cfg.rings.specs) do
+			self:paintRing("mefx_rg" .. i, foot.X, foot.Y, foot.Z, spec, i, 0)
+		end
+	end
+	if s.fx then
+		self:drawFx("mefx", foot, root.Position, 0)
+	end
+end
+
 function ESP:addEntity(id, opt)
 	assert(opt and opt.get, "entity needs a .get returning an Instance or Vector3")
 	self.entities[id] = {
@@ -759,6 +797,7 @@ function ESP:dropMatCham(uid)
 		end
 	end
 	self.mat[uid] = nil
+	self.matKind[uid] = nil
 end
 
 function ESP:killCham(uid)
@@ -776,19 +815,29 @@ function ESP:paintCham(plr, rig, visible)
 	if c.wallColors then
 		local tint = visible and c.visible or c.hidden
 		fill, line = tint, tint
+	elseif c.rainbow then
+		local tint = hueAt(self.clock * c.rainbowRate * 0.1 + uid * 0.05)
+		fill, line = tint, tint
 	end
 
 	if c.mode == "material" then
 		local live = self.hl[uid]
 		if live then live:Destroy() self.hl[uid] = nil end
-		local mat = Enum.Material[c.material] or Enum.Material.ForceField
-		local tint = c.wallColors and fill or c.matColor
+		local ok, mat = pcall(function() return Enum.Material[c.material] end)
+		mat = ok and mat or Enum.Material.ForceField
+		if self.matKind[uid] ~= c.material then
+			self:dropMatCham(uid)
+			self.matKind[uid] = c.material
+		end
+		local tint = (c.wallColors or c.rainbow) and fill or c.matColor
 		local saved = self.mat[uid] or {}
 		self.mat[uid] = saved
 		for _, part in ipairs(rig:GetChildren()) do
-			if part:IsA("BasePart") and (part.Name ~= "Head" or c.matHead) then
+			if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" and part.Transparency < 1 and (part.Name ~= "Head" or c.matHead) then
 				if not saved[part] then saved[part] = { part.Material, part.Color, part.Transparency } end
-				part.Material, part.Color, part.Transparency = mat, tint, c.matAlpha
+				part.Material = mat
+				part.Color = tint
+				part.Transparency = clamp(c.matAlpha, 0, 0.95)
 			end
 		end
 		return
@@ -1137,6 +1186,18 @@ function ESP:drawPlayer(plr, rig, root, hum, head, lx, ly, bw, bh, dist, visible
 		for _, hook in pairs(self.tagHooks) do
 			pcall(hook, self, plr, rig, lx, ly, bw, bh, dist)
 		end
+		if self.moduleOrder[1] then
+			local ctx = self._pctx
+			ctx.plr, ctx.rig, ctx.root, ctx.hum, ctx.head = plr, rig, root, hum, head
+			ctx.x, ctx.y, ctx.w, ctx.h, ctx.dist, ctx.visible, ctx.lod = lx, ly, bw, bh, dist, visible, lod
+			ctx.key, ctx.accent, ctx.foot = key, accent, foot
+			for _, name in ipairs(self.moduleOrder) do
+				local mod = self.modules[name]
+				if mod.enabled and mod.player then
+					pcall(mod.player, mod.state, ctx)
+				end
+			end
+		end
 	end
 end
 
@@ -1178,11 +1239,13 @@ function ESP:drawFx(key, foot, mid, lod)
 
 	if fx.synth.on then
 		local s = fx.synth
+		local sides = scaleSides(s.sides, lod)
 		for i = 1, s.rings do
 			local frac = ((t * s.speed * 0.1) + i / s.rings) % 1
 			local rad = math.max(s.radius * frac, 0.1)
-			local y = s.rise and s.radius * frac * 0.4 or 0
-			self:worldRing(key .. "sy" .. i, fx0, fy0 + y, fz0, scaleSides(s.sides, lod), hsv((s.hue + frac * s.hueSpan) % 1, 1, 1), s.thickness, s.alpha * (1 - frac), 0, { glow = true, glowAlpha = s.alpha * (1 - frac) * 0.4 })
+			local y = s.rise and s.radius * frac * 0.5 or 0
+			local fade = s.alpha * (1 - frac)
+			self:worldRing(key .. "sy" .. i .. "_", fx0, fy0 + y, fz0, rad, sides, hsv((s.hue + frac * s.hueSpan) % 1, 1, 1), s.thickness, fade, 0, s.glow and { glow = true, glowAlpha = fade * 0.4 } or nil)
 		end
 	end
 
@@ -1373,6 +1436,31 @@ function ESP:drawFx(key, foot, mid, lod)
 	if fx.burst.on then
 		local bu = fx.burst
 		self:worldStar(key .. "bu", mx, my, mz, bu.outer, bu.inner, bu.points, bu.rainbow and hueAt(t * 0.2) or bu.color, bu.thickness, bu.alpha, t * bu.spin)
+	end
+
+	if fx.ripple.on then
+		local rp = fx.ripple
+		local sides = scaleSides(rp.sides, lod)
+		for w = 1, rp.waves do
+			local frac = ((t * rp.speed * 0.1) + w / rp.waves) % 1
+			local rad = math.max(rp.radius * frac, 0.1)
+			self:worldRing(key .. "rp" .. w .. "_", fx0, fy0 + 0.05, fz0, rad, sides, rp.color, 1, 0, 0, { filled = true, fillAlpha = rp.alpha * (1 - frac) })
+		end
+	end
+
+	if fx.beam.on then
+		local bm = fx.beam
+		for i = 1, bm.count do
+			local ang = (i / bm.count) * TAU + t * bm.speed
+			local px = fx0 + cos(ang) * bm.radius
+			local pz = fz0 + sin(ang) * bm.radius
+			local ax, ay, ad = self:project(v3(px, fy0, pz))
+			local bx, by, bd = self:project(v3(px, fy0 + bm.height, pz))
+			if ad > 0 and bd > 0 then
+				local col = bm.rainbow and hueAt(t * 0.2 + i / bm.count) or bm.color
+				self.pool:line(key .. "bm" .. i, ax, ay, bx, by, col, bm.thickness, bm.alpha)
+			end
+		end
 	end
 end
 
@@ -1574,6 +1662,60 @@ end
 function ESP:onDraw(name, fn) self.tagHooks[name] = fn end
 function ESP:removeDraw(name) self.tagHooks[name] = nil end
 
+function ESP:register(spec)
+	assert(spec and spec.name, "module needs a name")
+	local mod = {
+		name    = spec.name,
+		enabled = spec.enabled == true,
+		state   = spec.state or {},
+		setup   = spec.setup,
+		player  = spec.player,
+		world   = spec.world,
+		screen  = spec.screen,
+		teardown= spec.teardown,
+	}
+	mod.state.esp = self
+	mod.state.cfg = mod.state.cfg or spec.config
+	if self.modules[spec.name] and self.modules[spec.name].teardown then
+		pcall(self.modules[spec.name].teardown, self.modules[spec.name].state)
+	end
+	if not self.modules[spec.name] then insert(self.moduleOrder, spec.name) end
+	self.modules[spec.name] = mod
+	if mod.setup then pcall(mod.setup, mod.state, self) end
+	return mod
+end
+
+function ESP:module(name) return self.modules[name] end
+
+function ESP:toggleModule(name, on)
+	local mod = self.modules[name]
+	if mod then mod.enabled = on == nil and not mod.enabled or on end
+end
+
+function ESP:unregister(name)
+	local mod = self.modules[name]
+	if not mod then return end
+	if mod.teardown then pcall(mod.teardown, mod.state) end
+	self.modules[name] = nil
+	for i, n in ipairs(self.moduleOrder) do
+		if n == name then remove(self.moduleOrder, i) break end
+	end
+end
+
+function ESP:runModuleWorld()
+	for _, name in ipairs(self.moduleOrder) do
+		local mod = self.modules[name]
+		if mod.enabled and mod.world then pcall(mod.world, mod.state, self) end
+	end
+end
+
+function ESP:runModuleScreen()
+	for _, name in ipairs(self.moduleOrder) do
+		local mod = self.modules[name]
+		if mod.enabled and mod.screen then pcall(mod.screen, mod.state, self) end
+	end
+end
+
 function ESP:collectRoster()
 	local eye = cam.CFrame.Position
 	local roster, n = self.roster, 0
@@ -1625,7 +1767,9 @@ function ESP:tick(dt)
 
 	self.pool:openFrame()
 	self:driveWorld()
+	self:runModuleWorld()
 	self:drawSelfRings()
+	self:drawSelfWorld()
 	self:drawSelfTrail()
 	self:drawFov()
 	self:drawCross()
@@ -1664,8 +1808,11 @@ function ESP:tick(dt)
 				if lx then
 					if bw < 4 then bw = 4 end
 					if bh < 6 then bh = 6 end
-					shown = shown + 1
-					self:drawPlayer(plr, rig, root, hum, head, lx, ly, bw, bh, dist, visible, self:lodOf(dist))
+					local vp = cam.ViewportSize
+					if lx + bw >= -48 and lx <= vp.X + 48 and ly + bh >= -48 and ly <= vp.Y + 48 then
+						shown = shown + 1
+						self:drawPlayer(plr, rig, root, hum, head, lx, ly, bw, bh, dist, visible, self:lodOf(dist))
+					end
 				end
 			elseif cfg.arrow.on then
 				local vp = cam.ViewportSize
@@ -1684,6 +1831,7 @@ function ESP:tick(dt)
 		end
 	end
 
+	self:runModuleScreen()
 	self.pool:closeFrame()
 end
 
@@ -1707,12 +1855,17 @@ function ESP:destroy()
 	self.running = false
 	if self.loop then self.loop:Disconnect() end
 	if self.playerLeft then self.playerLeft:Disconnect() end
+	for _, name in ipairs(self.moduleOrder) do
+		local mod = self.modules[name]
+		if mod and mod.teardown then pcall(mod.teardown, mod.state) end
+	end
 	self.pool:nuke()
 	for _, h in pairs(self.hl) do pcall(function() h:Destroy() end) end
 	for uid in pairs(self.mat) do self:dropMatCham(uid) end
 	self:restoreWorld()
-	self.hl, self.mat, self.hits, self.hpMem, self.btrk, self.myTrail = {}, {}, {}, {}, {}, {}
+	self.hl, self.mat, self.matKind, self.hits, self.hpMem, self.btrk, self.myTrail = {}, {}, {}, {}, {}, {}, {}
 	self.entities, self.selfRings, self.tagHooks = {}, {}, {}
+	self.modules, self.moduleOrder = {}, {}
 end
 
 return ESP
