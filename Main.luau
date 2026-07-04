@@ -2,7 +2,6 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
 local UserInputService = game:GetService("UserInputService")
-
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
@@ -17,10 +16,12 @@ EasyESP.Defaults = {
     Master = false,
     MaxDist = 3000,
     RefreshRate = 0,
+
     ESP = {
         Enabled = false,
         TeamCheck = false,
         VisibleCheck = false,
+
         Boxes = false,
         BoxStyle = "2D",
         BoxColor = Color3.fromRGB(255, 255, 255),
@@ -35,7 +36,6 @@ EasyESP.Defaults = {
         Rank = false,
         Flags = false,
         TextSize = 13,
-        TextFont = 2, -- Drawing font: 0=UI, 1=System, 2=Plex, 3=Monospace
         TextColor = Color3.fromRGB(255, 255, 255),
         TextOutline = true,
         HealthBar = false,
@@ -44,7 +44,7 @@ EasyESP.Defaults = {
         ArmorColor = Color3.fromRGB(0, 180, 255),
         StaminaBar = false,
         StaminaColor = Color3.fromRGB(255, 255, 0),
-        BarThickness = 3,
+        BarThickness = 2,
         BarOutline = true,
         Skeletons = false,
         SkeletonColor = Color3.fromRGB(255, 255, 255),
@@ -53,12 +53,15 @@ EasyESP.Defaults = {
         HeadDotSize = 3,
         LookLines = false,
         LookLen = 10,
+
         Tracers = false,
         TracerOrigin = "Bottom",
         TracerColor = Color3.fromRGB(255, 255, 255),
+
         Inventory = false,
         Hotbar = false,
         MaxItems = 5,
+
         Arrows = false,
         ArrowRadius = 200,
         ArrowSize = 15,
@@ -80,8 +83,8 @@ EasyESP.Defaults = {
         FOV = 70,
         NoFog = false,
         Brightness = 1,
-        Ambient = Color3.fromRGB(0,0,0),
-        OutdoorAmbient = Color3.fromRGB(0,0,0),
+        Ambient = Color3.fromRGB(0, 0, 0),
+        OutdoorAmbient = Color3.fromRGB(0, 0, 0),
         Exposure = 1,
         ColorCorrection = false,
         Saturation = 0,
@@ -91,15 +94,15 @@ EasyESP.Defaults = {
 
 local BONES = {
     R15 = {
-        {"Head","UpperTorso"},{"UpperTorso","LowerTorso"},
-        {"UpperTorso","LeftUpperArm"},{"LeftUpperArm","LeftLowerArm"},{"LeftLowerArm","LeftHand"},
-        {"UpperTorso","RightUpperArm"},{"RightUpperArm","RightLowerArm"},{"RightLowerArm","RightHand"},
-        {"LowerTorso","LeftUpperLeg"},{"LeftUpperLeg","LeftLowerLeg"},{"LeftLowerLeg","LeftFoot"},
-        {"LowerTorso","RightUpperLeg"},{"RightUpperLeg","RightLowerLeg"},{"RightLowerLeg","RightFoot"}
+        {"Head", "UpperTorso"}, {"UpperTorso", "LowerTorso"},
+        {"UpperTorso", "LeftUpperArm"}, {"LeftUpperArm", "LeftLowerArm"}, {"LeftLowerArm", "LeftHand"},
+        {"UpperTorso", "RightUpperArm"}, {"RightUpperArm", "RightLowerArm"}, {"RightLowerArm", "RightHand"},
+        {"LowerTorso", "LeftUpperLeg"}, {"LeftUpperLeg", "LeftLowerLeg"}, {"LeftLowerLeg", "LeftFoot"},
+        {"LowerTorso", "RightUpperLeg"}, {"RightUpperLeg", "RightLowerLeg"}, {"RightLowerLeg", "RightFoot"}
     },
     R6 = {
-        {"Head","Torso"},{"Torso","Left Arm"},{"Torso","Right Arm"},
-        {"Torso","Left Leg"},{"Torso","Right Leg"}
+        {"Head", "Torso"}, {"Torso", "Left Arm"}, {"Torso", "Right Arm"},
+        {"Torso", "Left Leg"}, {"Torso", "Right Leg"}
     }
 }
 
@@ -109,9 +112,9 @@ local BOX_OFFSETS = {
 }
 
 local BOX_EDGES = {
-    {1,2},{2,3},{3,4},{4,1},
-    {5,6},{6,7},{7,8},{8,5},
-    {1,5},{2,6},{3,7},{4,8}
+    {1, 2}, {2, 3}, {3, 4}, {4, 1},
+    {5, 6}, {6, 7}, {7, 8}, {8, 5},
+    {1, 5}, {2, 6}, {3, 7}, {4, 8}
 }
 
 function EasyESP.new()
@@ -124,6 +127,7 @@ function EasyESP.new()
         LastUpdate = 0,
         RainbowVal = 0
     }
+
     self.GetArmor = function(plr) return 0 end
     self.GetMaxArmor = function(plr) return 100 end
     self.GetStamina = function(plr) return 0 end
@@ -137,6 +141,7 @@ function EasyESP.new()
         local tool = char and char:FindFirstChildOfClass("Tool")
         return tool and tool.Name or "None"
     end
+
     return self
 end
 
@@ -148,14 +153,9 @@ function EasyESP:DeepCopy(t)
     return copy
 end
 
-function EasyESP:GetDrawing(id, drawingType)
+function EasyESP:GetDrawing(id, drawType)
     if self.State.Drawings[id] then return self.State.Drawings[id] end
-    local obj = Drawing.new(drawingType)
-    if drawingType == "Text" then
-        obj.Font = self.Settings.ESP.TextFont or 2
-        obj.Color = Color3.new(1, 1, 1)
-        obj.Outline = true
-    end
+    local obj = Drawing.new(drawType)
     self.State.Drawings[id] = obj
     return obj
 end
@@ -172,72 +172,90 @@ end
 function EasyESP:IsVisible(part, model)
     local origin = Camera.CFrame.Position
     local dir = (part.Position - origin)
-    local rayParams = RaycastParams.new()
-    rayParams.FilterDescendantsInstances = {LocalPlayer.Character, model, Camera}
-    rayParams.FilterType = Enum.RaycastFilterType.Exclude
-    local result = workspace:Raycast(origin, dir, rayParams)
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = {LocalPlayer.Character, model, Camera}
+    local result = workspace:Raycast(origin, dir, params)
     return result == nil
 end
 
--- Get accurate 2D bounding box from projecting all 8 3D corners
-function EasyESP:GetScreenBox(model)
-    local cf, size = model:GetBoundingBox()
+-- Get a proper bounding box in screen space from the character model
+function EasyESP:GetBoundingBox(char)
+    local cf, size = char:GetBoundingBox()
     local halfSize = size * 0.5
+
     local minX, minY = math.huge, math.huge
     local maxX, maxY = -math.huge, -math.huge
-    local anyOnScreen = false
-    local avgDepth = 0
+    local allOnScreen = true
+
     for _, offset in ipairs(BOX_OFFSETS) do
-        local wp = (cf * CFrame.new(offset * halfSize)).Position
-        local sp, onScreen = Camera:WorldToViewportPoint(wp)
-        if sp.Z > 0 then
-            if sp.X < minX then minX = sp.X end
-            if sp.Y < minY then minY = sp.Y end
-            if sp.X > maxX then maxX = sp.X end
-            if sp.Y > maxY then maxY = sp.Y end
-            avgDepth = avgDepth + sp.Z
-            if onScreen then anyOnScreen = true end
+        local worldPos = (cf * CFrame.new(offset * halfSize)).Position
+        local screenPos, depth, onScreen = self:W2S(worldPos)
+        if depth <= 0 then
+            allOnScreen = false
+            break
         end
+        if screenPos.X < minX then minX = screenPos.X end
+        if screenPos.Y < minY then minY = screenPos.Y end
+        if screenPos.X > maxX then maxX = screenPos.X end
+        if screenPos.Y > maxY then maxY = screenPos.Y end
     end
-    if minX == math.huge then return nil end
-    return {
-        x = minX,
-        y = minY,
-        w = maxX - minX,
-        h = maxY - minY,
-        onScreen = anyOnScreen,
-        depth = avgDepth / 8
-    }
+
+    if not allOnScreen then return nil end
+
+    local w = maxX - minX
+    local h = maxY - minY
+
+    return Vector2.new(minX, minY), Vector2.new(w, h), true
 end
 
 function EasyESP:Render3DBox(id, model, color, isCorner)
     local cf, size = model:GetBoundingBox()
-    size = size * 0.5
+    local halfSize = size * 0.5
     local corners = {}
+    local allVisible = true
+
     for i, offset in ipairs(BOX_OFFSETS) do
-        local wp = (cf * CFrame.new(offset * size)).Position
-        local sp, onScreen = Camera:WorldToViewportPoint(wp)
-        if sp.Z <= 0 then return end
-        corners[i] = Vector2.new(sp.X, sp.Y)
+        local wp = (cf * CFrame.new(offset * halfSize)).Position
+        local pos, z, onScreen = self:W2S(wp)
+        if z <= 0 then allVisible = false; break end
+        corners[i] = pos
     end
+
+    if not allVisible then
+        for i = 1, #BOX_EDGES do
+            local line = self:GetDrawing(id .. "_3d_" .. i, "Line")
+            line.Visible = false
+            if isCorner then
+                local line2 = self:GetDrawing(id .. "_3dc_" .. i, "Line")
+                line2.Visible = false
+            end
+        end
+        return
+    end
+
     for i, edge in ipairs(BOX_EDGES) do
         local line = self:GetDrawing(id .. "_3d_" .. i, "Line")
         line.Visible = true
+        line.From = corners[edge[1]]
+        line.To = corners[edge[2]]
         line.Color = color
         line.Thickness = self.Settings.ESP.BoxThickness
+
         if isCorner then
-            local dir = (corners[edge[2]] - corners[edge[1]])
-            line.From = corners[edge[1]]
-            line.To = corners[edge[1]] + (dir * 0.25)
-            local line2 = self:GetDrawing(id .. "_3dc_" .. i, "Line")
-            line2.Visible = true
-            line2.From = corners[edge[2]]
-            line2.To = corners[edge[2]] - (dir * 0.25)
-            line2.Color = color
-            line2.Thickness = self.Settings.ESP.BoxThickness
-        else
-            line.From = corners[edge[1]]
-            line.To = corners[edge[2]]
+            local dir = (line.To - line.From)
+            local len = dir.Magnitude
+            if len > 0 then
+                local unit = dir / len
+                line.To = line.From + unit * (len * 0.25)
+
+                local line2 = self:GetDrawing(id .. "_3dc_" .. i, "Line")
+                line2.Visible = true
+                line2.From = corners[edge[2]]
+                line2.To = corners[edge[2]] - unit * (len * 0.25)
+                line2.Color = color
+                line2.Thickness = self.Settings.ESP.BoxThickness
+            end
         end
     end
 end
@@ -248,15 +266,19 @@ function EasyESP:RenderSkeleton(id, char, color)
         local a, b = char:FindFirstChild(bone[1]), char:FindFirstChild(bone[2])
         local line = self:GetDrawing(id .. "_skel_" .. i, "Line")
         if a and b then
-            local spA, onA = Camera:WorldToViewportPoint(a.Position)
-            local spB, onB = Camera:WorldToViewportPoint(b.Position)
-            if spA.Z > 0 and spB.Z > 0 then
+            local posA, zA, visA = self:W2S(a.Position)
+            local posB, zB, visB = self:W2S(b.Position)
+            if visA and visB and zA > 0 and zB > 0 then
                 line.Visible = true
-                line.From = Vector2.new(spA.X, spA.Y)
-                line.To = Vector2.new(spB.X, spB.Y)
+                line.From = posA
+                line.To = posB
                 line.Color = color
                 line.Thickness = 1
+            else
+                line.Visible = false
             end
+        else
+            line.Visible = false
         end
     end
 end
@@ -272,6 +294,7 @@ function EasyESP:RenderTracer(id, target, color)
     elseif s.TracerOrigin == "Mouse" then
         origin = UserInputService:GetMouseLocation()
     end
+
     local line = self:GetDrawing(id .. "_tracer", "Line")
     line.Visible = true
     line.From = origin
@@ -280,58 +303,90 @@ function EasyESP:RenderTracer(id, target, color)
     line.Thickness = 1
 end
 
-function EasyESP:RenderBar(id, x, y, h, pct, color, offset)
+function EasyESP:RenderBar(id, boxX, boxY, boxH, pct, color, offset)
     local s = self.Settings.ESP
-    local thickness = s.BarThickness
-    local spacing = thickness + 3
-    local xPos = x - 5 - (offset * spacing)
+    local barW = s.BarThickness
+    local xPos = boxX - 5 - (offset * (barW + 3))
+    local barH = boxH
+
     pct = math.clamp(pct, 0, 1)
-    
+
     if s.BarOutline then
         local out = self:GetDrawing(id .. "_baro_" .. offset, "Square")
         out.Visible = true
         out.Filled = true
         out.Color = Color3.new(0, 0, 0)
-        out.Position = Vector2.new(xPos - 1, y - 1)
-        out.Size = Vector2.new(thickness + 2, h + 2)
-        out.Thickness = 1
+        out.Transparency = 0.6
+        out.Position = Vector2.new(xPos - 1, boxY - 1)
+        out.Size = Vector2.new(barW + 2, barH + 2)
     end
-    
-    -- Background of bar (dark)
+
+    -- Background
     local bg = self:GetDrawing(id .. "_barbg_" .. offset, "Square")
     bg.Visible = true
     bg.Filled = true
-    bg.Color = Color3.fromRGB(30, 30, 30)
-    bg.Position = Vector2.new(xPos, y)
-    bg.Size = Vector2.new(thickness, h)
-    
-    -- Filled portion (bottom-up)
-    local fillH = h * pct
+    bg.Color = Color3.new(0.15, 0.15, 0.15)
+    bg.Transparency = 0.5
+    bg.Position = Vector2.new(xPos, boxY)
+    bg.Size = Vector2.new(barW, barH)
+
+    -- Fill
+    local fillH = barH * pct
     local main = self:GetDrawing(id .. "_bar_" .. offset, "Square")
     main.Visible = true
     main.Filled = true
     main.Color = color
-    main.Position = Vector2.new(xPos, y + (h - fillH))
-    main.Size = Vector2.new(thickness, fillH)
+    main.Transparency = 1
+    main.Position = Vector2.new(xPos, boxY + (barH - fillH))
+    main.Size = Vector2.new(barW, math.max(fillH, 1))
 end
 
 function EasyESP:RenderList(id, x, y, items, title)
     if #items == 0 then return 0 end
     local s = self.Settings.ESP
-    local txt = self:GetDrawing(id .. "_l_" .. title, "Text")
-    txt.Visible = true
-    txt.Size = s.TextSize - 1
-    txt.Color = Color3.fromRGB(220, 220, 220)
-    txt.Outline = true
-    txt.OutlineColor = Color3.new(0, 0, 0)
-    txt.Font = s.TextFont or 2
-    local str = title .. ":"
+    local fontSize = math.max(s.TextSize - 2, 10)
+    local lineHeight = fontSize + 2
+    local totalHeight = 0
+
+    -- Title
+    local titleTxt = self:GetDrawing(id .. "_lt_" .. title, "Text")
+    titleTxt.Visible = true
+    titleTxt.Size = fontSize
+    titleTxt.Font = 2
+    titleTxt.Color = Color3.fromRGB(200, 200, 200)
+    titleTxt.Outline = true
+    titleTxt.OutlineColor = Color3.new(0, 0, 0)
+    titleTxt.Text = title .. ":"
+    titleTxt.Position = Vector2.new(x, y + totalHeight)
+    totalHeight = totalHeight + lineHeight
+
     for i = 1, math.min(#items, s.MaxItems) do
-        str = str .. "\n• " .. tostring(items[i])
+        local itemTxt = self:GetDrawing(id .. "_li_" .. title .. "_" .. i, "Text")
+        itemTxt.Visible = true
+        itemTxt.Size = fontSize
+        itemTxt.Font = 2
+        itemTxt.Color = Color3.fromRGB(255, 255, 255)
+        itemTxt.Outline = true
+        itemTxt.OutlineColor = Color3.new(0, 0, 0)
+        itemTxt.Text = "  " .. tostring(items[i])
+        itemTxt.Position = Vector2.new(x, y + totalHeight)
+        totalHeight = totalHeight + lineHeight
     end
-    txt.Text = str
-    txt.Position = Vector2.new(x, y)
-    return txt.TextBounds.Y + 4
+
+    if #items > s.MaxItems then
+        local moreTxt = self:GetDrawing(id .. "_lm_" .. title, "Text")
+        moreTxt.Visible = true
+        moreTxt.Size = fontSize - 1
+        moreTxt.Font = 2
+        moreTxt.Color = Color3.fromRGB(150, 150, 150)
+        moreTxt.Outline = true
+        moreTxt.OutlineColor = Color3.new(0, 0, 0)
+        moreTxt.Text = "  +" .. (#items - s.MaxItems) .. " more"
+        moreTxt.Position = Vector2.new(x, y + totalHeight)
+        totalHeight = totalHeight + lineHeight
+    end
+
+    return totalHeight + 4
 end
 
 function EasyESP:UpdateWorld()
@@ -343,30 +398,47 @@ function EasyESP:UpdateWorld()
     Lighting.ExposureCompensation = w.Exposure
     Camera.FieldOfView = w.FOV
     if w.NoFog then Lighting.FogEnd = 1e7 end
-    local cc = Lighting:FindFirstChild("EasyESP_CC") or Instance.new("ColorCorrectionEffect", Lighting)
-    cc.Name = "EasyESP_CC"
+    local cc = Lighting:FindFirstChild("EasyESP_CC")
+    if not cc then
+        cc = Instance.new("ColorCorrectionEffect")
+        cc.Name = "EasyESP_CC"
+        cc.Parent = Lighting
+    end
     cc.Enabled = w.ColorCorrection
     cc.Saturation = w.Saturation
     cc.Contrast = w.Contrast
 end
 
+function EasyESP:MakeText(id, text, pos, size, color, center, font)
+    local t = self:GetDrawing(id, "Text")
+    t.Visible = true
+    t.Text = text
+    t.Position = pos
+    t.Size = size or self.Settings.ESP.TextSize
+    t.Color = color or self.Settings.ESP.TextColor
+    t.Center = center ~= false
+    t.Outline = true
+    t.OutlineColor = Color3.new(0, 0, 0)
+    t.Font = font or 2
+    return t
+end
+
 function EasyESP:Start()
     if self.State.Active then return end
     self.State.Active = true
+
     table.insert(self.State.Connections, RunService.RenderStepped:Connect(function(dt)
         if not self.Settings.Master then self:HideAll() return end
-        
+
         self.State.RainbowVal = (self.State.RainbowVal + dt * self.Settings.ESP.RainbowSpeed * 0.1) % 1
         local rainbow = Color3.fromHSV(self.State.RainbowVal, 1, 1)
-        
+
         if os.clock() - self.State.LastUpdate < self.Settings.RefreshRate then return end
         self.State.LastUpdate = os.clock()
-        
+
         self:HideAll()
         self:UpdateWorld()
-        
-        local sESP = self.Settings.ESP
-        
+
         for _, plr in ipairs(Players:GetPlayers()) do
             if plr == LocalPlayer or not plr.Character then continue end
             local char = plr.Character
@@ -374,249 +446,297 @@ function EasyESP:Start()
             local hum = char:FindFirstChildOfClass("Humanoid")
             local head = char:FindFirstChild("Head")
             if not root or not hum or hum.Health <= 0 then continue end
-            
+
+            local screenPos, depth, onScreen = self:W2S(root.Position)
             local dist = (Camera.CFrame.Position - root.Position).Magnitude
             if dist > self.Settings.MaxDist then continue end
-            
+
             local id = tostring(plr.UserId)
-            local color = sESP.Rainbow and rainbow or sESP.BoxColor
-            
-            if sESP.VisibleCheck and not self:IsVisible(root, char) then
+            local s = self.Settings.ESP
+            local color = s.Rainbow and rainbow or s.BoxColor
+            local textColor = s.Rainbow and rainbow or s.TextColor
+
+            if s.VisibleCheck and not self:IsVisible(root, char) then
                 color = Color3.fromRGB(255, 50, 50)
+                textColor = Color3.fromRGB(255, 80, 80)
             end
-            
-            local rootScreen, rootDepth, rootOnScreen = self:W2S(root.Position)
-            
-            if rootOnScreen and rootDepth > 0 then
-                -- Get accurate 2D box from 3D bounding box projection
-                local box = self:GetScreenBox(char)
-                if not box then continue end
-                
-                local x, y, w, h = box.x, box.y, box.w, box.h
-                
-                if sESP.Enabled then
-                    local style = sESP.BoxStyle
-                    
+
+            if onScreen and depth > 0 then
+                -- Get proper bounding box
+                local boxPos, boxSize, boxValid = self:GetBoundingBox(char)
+                if not boxValid then continue end
+
+                local bx, by = boxPos.X, boxPos.Y
+                local bw, bh = boxSize.X, boxSize.Y
+
+                -- Clamp minimum box size
+                if bw < 4 then bw = 4 end
+                if bh < 6 then bh = 6 end
+
+                local centerX = bx + bw / 2
+
+                if s.Enabled then
+                    local style = s.BoxStyle
+
+                    -- ========================
+                    -- BOXES
+                    -- ========================
                     if style == "3D" then
                         self:Render3DBox(id, char, color, false)
                     elseif style == "3DCorner" then
                         self:Render3DBox(id, char, color, true)
                     elseif style == "2D" then
-                        -- Outline for contrast
-                        if sESP.BoxOutline then
+                        if s.BoxOutline then
                             local outline = self:GetDrawing(id .. "_bo", "Square")
                             outline.Visible = true
-                            outline.Position = Vector2.new(x - 1, y - 1)
-                            outline.Size = Vector2.new(w + 2, h + 2)
+                            outline.Position = Vector2.new(bx - 1, by - 1)
+                            outline.Size = Vector2.new(bw + 2, bh + 2)
                             outline.Color = Color3.new(0, 0, 0)
-                            outline.Thickness = sESP.BoxThickness + 2
+                            outline.Thickness = s.BoxThickness + 2
                             outline.Filled = false
+                            outline.Transparency = 1
                         end
-                        local boxD = self:GetDrawing(id .. "_b", "Square")
-                        boxD.Visible = true
-                        boxD.Position = Vector2.new(x, y)
-                        boxD.Size = Vector2.new(w, h)
-                        boxD.Color = color
-                        boxD.Thickness = sESP.BoxThickness
-                        boxD.Filled = false
-                        if sESP.BoxFill then
+
+                        local box = self:GetDrawing(id .. "_b", "Square")
+                        box.Visible = true
+                        box.Position = Vector2.new(bx, by)
+                        box.Size = Vector2.new(bw, bh)
+                        box.Color = color
+                        box.Thickness = s.BoxThickness
+                        box.Filled = false
+                        box.Transparency = 1
+
+                        if s.BoxFill then
                             local fill = self:GetDrawing(id .. "_bf", "Square")
                             fill.Visible = true
-                            fill.Position = Vector2.new(x, y)
-                            fill.Size = Vector2.new(w, h)
+                            fill.Position = Vector2.new(bx, by)
+                            fill.Size = Vector2.new(bw, bh)
                             fill.Color = color
                             fill.Filled = true
-                            fill.Transparency = sESP.BoxFillAlpha
+                            fill.Transparency = s.BoxFillAlpha
                         end
                     elseif style == "Corner" then
-                        local cornerLen = math.min(w, h) * 0.25
-                        local corners = {
-                            {Vector2.new(x, y), Vector2.new(x + cornerLen, y), Vector2.new(x, y + cornerLen)},
-                            {Vector2.new(x + w, y), Vector2.new(x + w - cornerLen, y), Vector2.new(x + w, y + cornerLen)},
-                            {Vector2.new(x, y + h), Vector2.new(x + cornerLen, y + h), Vector2.new(x, y + h - cornerLen)},
-                            {Vector2.new(x + w, y + h), Vector2.new(x + w - cornerLen, y + h), Vector2.new(x + w, y + h - cornerLen)},
+                        local cornerLen = math.min(bw, bh) * 0.25
+
+                        if s.BoxOutline then
+                            local corners_outline = {
+                                -- Top-left
+                                {Vector2.new(bx - 1, by - 1), Vector2.new(bx + cornerLen + 1, by - 1)},
+                                {Vector2.new(bx - 1, by - 1), Vector2.new(bx - 1, by + cornerLen + 1)},
+                                -- Top-right
+                                {Vector2.new(bx + bw + 1, by - 1), Vector2.new(bx + bw - cornerLen - 1, by - 1)},
+                                {Vector2.new(bx + bw + 1, by - 1), Vector2.new(bx + bw + 1, by + cornerLen + 1)},
+                                -- Bottom-left
+                                {Vector2.new(bx - 1, by + bh + 1), Vector2.new(bx + cornerLen + 1, by + bh + 1)},
+                                {Vector2.new(bx - 1, by + bh + 1), Vector2.new(bx - 1, by + bh - cornerLen - 1)},
+                                -- Bottom-right
+                                {Vector2.new(bx + bw + 1, by + bh + 1), Vector2.new(bx + bw - cornerLen - 1, by + bh + 1)},
+                                {Vector2.new(bx + bw + 1, by + bh + 1), Vector2.new(bx + bw + 1, by + bh - cornerLen - 1)},
+                            }
+                            for ci, cp in ipairs(corners_outline) do
+                                local cl = self:GetDrawing(id .. "_co_" .. ci, "Line")
+                                cl.Visible = true
+                                cl.From = cp[1]
+                                cl.To = cp[2]
+                                cl.Color = Color3.new(0, 0, 0)
+                                cl.Thickness = s.BoxThickness + 2
+                            end
+                        end
+
+                        local corners_inner = {
+                            {Vector2.new(bx, by), Vector2.new(bx + cornerLen, by)},
+                            {Vector2.new(bx, by), Vector2.new(bx, by + cornerLen)},
+                            {Vector2.new(bx + bw, by), Vector2.new(bx + bw - cornerLen, by)},
+                            {Vector2.new(bx + bw, by), Vector2.new(bx + bw, by + cornerLen)},
+                            {Vector2.new(bx, by + bh), Vector2.new(bx + cornerLen, by + bh)},
+                            {Vector2.new(bx, by + bh), Vector2.new(bx, by + bh - cornerLen)},
+                            {Vector2.new(bx + bw, by + bh), Vector2.new(bx + bw - cornerLen, by + bh)},
+                            {Vector2.new(bx + bw, by + bh), Vector2.new(bx + bw, by + bh - cornerLen)},
                         }
-                        for ci, c in ipairs(corners) do
-                            local l1 = self:GetDrawing(id .. "_c1_" .. ci, "Line")
-                            local l2 = self:GetDrawing(id .. "_c2_" .. ci, "Line")
-                            l1.Visible = true; l1.From = c[1]; l1.To = c[2]; l1.Color = color; l1.Thickness = sESP.BoxThickness
-                            l2.Visible = true; l2.From = c[1]; l2.To = c[3]; l2.Color = color; l2.Thickness = sESP.BoxThickness
+                        for ci, cp in ipairs(corners_inner) do
+                            local cl = self:GetDrawing(id .. "_c_" .. ci, "Line")
+                            cl.Visible = true
+                            cl.From = cp[1]
+                            cl.To = cp[2]
+                            cl.Color = color
+                            cl.Thickness = s.BoxThickness
+                        end
+
+                        if s.BoxFill then
+                            local fill = self:GetDrawing(id .. "_bf", "Square")
+                            fill.Visible = true
+                            fill.Position = Vector2.new(bx, by)
+                            fill.Size = Vector2.new(bw, bh)
+                            fill.Color = color
+                            fill.Filled = true
+                            fill.Transparency = s.BoxFillAlpha
                         end
                     end
-                    
-                    if sESP.Skeletons then self:RenderSkeleton(id, char, color) end
-                    
-                    if sESP.HeadDot and head then
-                        local hp, _, hOn = self:W2S(head.Position)
-                        if hOn then
+
+                    -- ========================
+                    -- SKELETONS
+                    -- ========================
+                    if s.Skeletons then
+                        self:RenderSkeleton(id, char, s.Rainbow and rainbow or s.SkeletonColor)
+                    end
+
+                    -- ========================
+                    -- HEAD DOT
+                    -- ========================
+                    if s.HeadDot and head then
+                        local hPos, hDepth, hOn = self:W2S(head.Position)
+                        if hOn and hDepth > 0 then
+                            local scaledRadius = math.clamp(s.HeadDotSize * (1000 / (dist + 100)), 2, 20)
                             local dot = self:GetDrawing(id .. "_hdot", "Circle")
                             dot.Visible = true
-                            dot.Position = hp
-                            dot.Radius = sESP.HeadDotSize
+                            dot.Position = hPos
+                            dot.Radius = scaledRadius
                             dot.Color = color
                             dot.Filled = true
-                            dot.NumSides = 12
+                            dot.Transparency = 1
                         end
                     end
-                    
-                    if sESP.LookLines and head then
-                        -- Use small world-space offset (studs), independent of screen size
-                        local startPos, _, sOn = self:W2S(head.Position)
-                        local endWorld = head.Position + head.CFrame.LookVector * (sESP.LookLen or 10)
-                        local endPos, endZ, eOn = self:W2S(endWorld)
-                        if sOn and endZ > 0 then
-                            local line = self:GetDrawing(id .. "_look", "Line")
+
+                    -- ========================
+                    -- LOOK LINES (fixed length)
+                    -- ========================
+                    if s.LookLines and head then
+                        local headScreen, headDepth, headOn = self:W2S(head.Position)
+                        local lookEnd = head.Position + head.CFrame.LookVector * s.LookLen
+                        local lookScreen, lookDepth, lookOn = self:W2S(lookEnd)
+                        local line = self:GetDrawing(id .. "_look", "Line")
+                        if headOn and lookOn and headDepth > 0 and lookDepth > 0 then
                             line.Visible = true
-                            line.From = startPos
-                            line.To = endPos
+                            line.From = headScreen
+                            line.To = lookScreen
                             line.Color = color
                             line.Thickness = 1
+                        else
+                            line.Visible = false
                         end
                     end
-                    
-                    if sESP.Tracers then
-                        self:RenderTracer(id, Vector2.new(x + w / 2, y + h), color)
+
+                    -- ========================
+                    -- TRACERS
+                    -- ========================
+                    if s.Tracers then
+                        self:RenderTracer(id, Vector2.new(centerX, by + bh), color)
                     end
-                    
-                    -- BARS: scaled to actual character screen height
-                    local bIdx = 0
-                    if sESP.HealthBar then
-                        local pct = hum.MaxHealth > 0 and hum.Health / hum.MaxHealth or 0
-                        local barColor = sESP.HealthBarGradient and Color3.fromHSV(math.clamp(pct, 0, 1) * 0.33, 1, 1) or Color3.new(0, 1, 0)
-                        self:RenderBar(id, x, y, h, pct, barColor, bIdx)
-                        bIdx = bIdx + 1
+
+                    -- ========================
+                    -- BARS (left side, properly scaled)
+                    -- ========================
+                    local barIndex = 0
+                    if s.HealthBar then
+                        local pct = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+                        local barColor = s.HealthBarGradient and Color3.fromHSV(pct * 0.3, 1, 1) or Color3.new(0, 1, 0)
+                        self:RenderBar(id, bx, by, bh, pct, barColor, barIndex)
+                        barIndex = barIndex + 1
                     end
-                    if sESP.ArmorBar then
-                        local maxA = self.GetMaxArmor(plr)
-                        local pct = maxA > 0 and self.GetArmor(plr) / maxA or 0
-                        self:RenderBar(id, x, y, h, pct, sESP.ArmorColor, bIdx)
-                        bIdx = bIdx + 1
+                    if s.ArmorBar then
+                        local maxArmor = self.GetMaxArmor(plr)
+                        local curArmor = self.GetArmor(plr)
+                        local pct = maxArmor > 0 and math.clamp(curArmor / maxArmor, 0, 1) or 0
+                        self:RenderBar(id, bx, by, bh, pct, s.ArmorColor, barIndex)
+                        barIndex = barIndex + 1
                     end
-                    if sESP.StaminaBar then
-                        local maxS = self.GetMaxStamina(plr)
-                        local pct = maxS > 0 and self.GetStamina(plr) / maxS or 0
-                        self:RenderBar(id, x, y, h, pct, sESP.StaminaColor, bIdx)
+                    if s.StaminaBar then
+                        local maxStamina = self.GetMaxStamina(plr)
+                        local curStamina = self.GetStamina(plr)
+                        local pct = maxStamina > 0 and math.clamp(curStamina / maxStamina, 0, 1) or 0
+                        self:RenderBar(id, bx, by, bh, pct, s.StaminaColor, barIndex)
                     end
-                    
-                    -- TEXT ABOVE HEAD
-                    local cx = x + w / 2
-                    local textPad = 4
-                    local ty = y - sESP.TextSize - textPad
-                    
-                    if sESP.Flags then
+
+                    -- ========================
+                    -- TEXT ABOVE (names, rank)
+                    -- ========================
+                    local topY = by - 4
+                    local fontSize = math.clamp(s.TextSize, 10, 24)
+
+                    if s.Names or s.Usernames then
+                        local str = ""
+                        if s.Names then str = plr.DisplayName end
+                        if s.Usernames then
+                            if str ~= "" then
+                                str = str .. " (@" .. plr.Name .. ")"
+                            else
+                                str = "@" .. plr.Name
+                            end
+                        end
+                        topY = topY - fontSize
+                        self:MakeText(id .. "_n", str, Vector2.new(centerX, topY), fontSize, textColor, true, 2)
+                    end
+
+                    if s.Rank then
+                        local rankStr = self.GetRank(plr)
+                        if rankStr and rankStr ~= "" and rankStr ~= "None" then
+                            topY = topY - (fontSize - 1)
+                            self:MakeText(id .. "_rank", "[" .. rankStr .. "]", Vector2.new(centerX, topY), fontSize - 2, Color3.fromRGB(255, 200, 100), true, 2)
+                        end
+                    end
+
+                    -- ========================
+                    -- TEXT BELOW (distance, tool, flags)
+                    -- ========================
+                    local botY = by + bh + 3
+
+                    if s.Distance then
+                        self:MakeText(id .. "_d", math.floor(dist) .. "m", Vector2.new(centerX, botY), fontSize - 2, Color3.fromRGB(200, 200, 200), true, 2)
+                        botY = botY + (fontSize - 1)
+                    end
+
+                    if s.Tool then
+                        local toolName = self.GetTool(plr)
+                        if toolName and toolName ~= "None" then
+                            self:MakeText(id .. "_t", toolName, Vector2.new(centerX, botY), fontSize - 2, Color3.fromRGB(180, 220, 255), true, 2)
+                            botY = botY + (fontSize - 1)
+                        end
+                    end
+
+                    if s.Flags then
                         local flags = self.GetFlags(plr)
                         if #flags > 0 then
-                            local t = self:GetDrawing(id .. "_f", "Text")
-                            t.Visible = true
-                            t.Center = true
-                            t.Outline = true
-                            t.OutlineColor = Color3.new(0, 0, 0)
-                            t.Size = sESP.TextSize - 2
-                            t.Color = Color3.fromRGB(255, 60, 60)
-                            t.Font = sESP.TextFont or 2
-                            t.Text = table.concat(flags, " | ")
-                            t.Position = Vector2.new(cx, ty)
-                            ty = ty - (sESP.TextSize)
+                            self:MakeText(id .. "_f", table.concat(flags, " | "), Vector2.new(centerX, botY), fontSize - 3, Color3.fromRGB(255, 80, 80), true, 2)
+                            botY = botY + (fontSize - 2)
                         end
                     end
-                    
-                    if sESP.Rank then
-                        local t = self:GetDrawing(id .. "_rank", "Text")
-                        t.Visible = true
-                        t.Center = true
-                        t.Outline = true
-                        t.OutlineColor = Color3.new(0, 0, 0)
-                        t.Size = sESP.TextSize - 1
-                        t.Color = Color3.fromRGB(200, 200, 255)
-                        t.Font = sESP.TextFont or 2
-                        t.Text = "[" .. tostring(self.GetRank(plr)) .. "]"
-                        t.Position = Vector2.new(cx, ty)
-                        ty = ty - (sESP.TextSize)
+
+                    -- ========================
+                    -- LISTS (right side)
+                    -- ========================
+                    local listX = bx + bw + 6
+                    local listY = by
+
+                    if s.Hotbar then
+                        listY = listY + self:RenderList(id, listX, listY, self.GetHotbar(plr), "Hotbar")
                     end
-                    
-                    if sESP.Names or sESP.Usernames then
-                        local t = self:GetDrawing(id .. "_n", "Text")
-                        t.Visible = true
-                        t.Size = sESP.TextSize
-                        t.Center = true
-                        t.Outline = true
-                        t.OutlineColor = Color3.new(0, 0, 0)
-                        t.Color = sESP.TextColor
-                        t.Font = sESP.TextFont or 2
-                        local str = ""
-                        if sESP.Names and sESP.Usernames then
-                            str = plr.DisplayName .. " (@" .. plr.Name .. ")"
-                        elseif sESP.Names then
-                            str = plr.DisplayName
-                        elseif sESP.Usernames then
-                            str = "@" .. plr.Name
-                        end
-                        t.Text = str
-                        t.Position = Vector2.new(cx, ty)
-                    end
-                    
-                    -- TEXT BELOW BOX
-                    local by = y + h + 2
-                    
-                    if sESP.Distance then
-                        local t = self:GetDrawing(id .. "_d", "Text")
-                        t.Visible = true
-                        t.Center = true
-                        t.Outline = true
-                        t.OutlineColor = Color3.new(0, 0, 0)
-                        t.Size = sESP.TextSize - 1
-                        t.Color = sESP.TextColor
-                        t.Font = sESP.TextFont or 2
-                        t.Text = "[" .. math.floor(dist) .. "m]"
-                        t.Position = Vector2.new(cx, by)
-                        by = by + (sESP.TextSize)
-                    end
-                    
-                    if sESP.Tool then
-                        local t = self:GetDrawing(id .. "_t", "Text")
-                        t.Visible = true
-                        t.Center = true
-                        t.Outline = true
-                        t.OutlineColor = Color3.new(0, 0, 0)
-                        t.Size = sESP.TextSize - 1
-                        t.Color = Color3.fromRGB(255, 255, 180)
-                        t.Font = sESP.TextFont or 2
-                        t.Text = tostring(self.GetTool(plr))
-                        t.Position = Vector2.new(cx, by)
-                        by = by + (sESP.TextSize)
-                    end
-                    
-                    -- LISTS TO THE RIGHT
-                    local lx, ly = x + w + 6, y
-                    if sESP.Hotbar then
-                        ly = ly + self:RenderList(id, lx, ly, self.GetHotbar(plr), "Hotbar") + 2
-                    end
-                    if sESP.Inventory then
-                        self:RenderList(id, lx, ly, self.GetInventory(plr), "Inventory")
+                    if s.Inventory then
+                        self:RenderList(id, listX, listY, self.GetInventory(plr), "Inventory")
                     end
                 end
-            elseif sESP.Arrows then
-                local viewport = Camera.ViewportSize
-                local center = Vector2.new(viewport.X / 2, viewport.Y / 2)
-                local sp = Vector2.new(rootScreen.X, rootScreen.Y)
-                if rootDepth < 0 then sp = center * 2 - sp end
-                local diff = sp - center
-                if diff.Magnitude < 0.01 then continue end
-                local dir = diff.Unit
-                local arrowPos = center + dir * sESP.ArrowRadius
+
+            elseif s.Arrows and s.Enabled then
+                -- Off-screen arrows
+                local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+                local dir = (Vector2.new(screenPos.X, screenPos.Y) - center)
+                local len = dir.Magnitude
+                if len > 0 then
+                    dir = dir / len
+                end
+                local arrowPos = center + dir * s.ArrowRadius
                 local rot = math.atan2(dir.Y, dir.X)
+
                 local a1 = self:GetDrawing(id .. "_a1", "Line")
                 local a2 = self:GetDrawing(id .. "_a2", "Line")
-                a1.Visible = true
-                a1.Color = color
-                a1.Thickness = 2
-                a1.From = arrowPos
-                a1.To = arrowPos - Vector2.new(math.cos(rot + 0.5), math.sin(rot + 0.5)) * sESP.ArrowSize
-                a2.Visible = true
-                a2.Color = color
-                a2.Thickness = 2
-                a2.From = arrowPos
-                a2.To = arrowPos - Vector2.new(math.cos(rot - 0.5), math.sin(rot - 0.5)) * sESP.ArrowSize
+                local a3 = self:GetDrawing(id .. "_a3", "Line")
+
+                local tip = arrowPos
+                local left = arrowPos - Vector2.new(math.cos(rot + 0.5), math.sin(rot + 0.5)) * s.ArrowSize
+                local right = arrowPos - Vector2.new(math.cos(rot - 0.5), math.sin(rot - 0.5)) * s.ArrowSize
+
+                a1.Visible = true; a1.Color = color; a1.From = tip; a1.To = left; a1.Thickness = 2
+                a2.Visible = true; a2.Color = color; a2.From = tip; a2.To = right; a2.Thickness = 2
+                a3.Visible = true; a3.Color = color; a3.From = left; a3.To = right; a3.Thickness = 2
             end
         end
     end))
@@ -627,6 +747,10 @@ function EasyESP:Destroy()
     for _, c in ipairs(self.State.Connections) do c:Disconnect() end
     for _, v in pairs(self.State.Drawings) do v:Remove() end
     self.State.Drawings = {}
+    self.State.Connections = {}
+
+    local cc = Lighting:FindFirstChild("EasyESP_CC")
+    if cc then cc:Destroy() end
 end
 
 return EasyESP
