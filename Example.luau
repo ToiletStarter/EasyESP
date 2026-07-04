@@ -44,7 +44,8 @@ general:AddToggle("Enabled", cfg.enabled, function(on)
 	cfg.enabled = on
 	UI:Toast("EasyESP", on and "On" or "Off", 2, on and "ok" or "warn")
 end)
-general:AddSlider("Max Range", 100, 5000, cfg.maxRange, 0, function(n) cfg.maxRange = n end)
+general:AddSlider("ESP Range", 100, 5000, cfg.espRange, 0, function(n) cfg.espRange = n end)
+general:AddSlider("World/Max Range", 100, 5000, cfg.maxRange, 0, function(n) cfg.maxRange = n end)
 general:AddSlider("Refresh (ms)", 0, 100, cfg.refresh * 1000, 0, function(n) cfg.refresh = n / 1000 end)
 general:AddToggle("Team Check", cfg.teamCheck, function(x) cfg.teamCheck = x end)
 general:AddToggle("Wall Check (hide occluded)", cfg.wallHide, function(x) cfg.wallHide = x end)
@@ -67,7 +68,7 @@ box:AddColorPicker("Box Color", cfg.box.color, function(c) cfg.box.color = c end
 
 box:AddSeparator("Text")
 box:AddToggle("Name", cfg.name.on, function(x) cfg.name.on = x end)
-box:AddToggle("@Username", cfg.name.showUser, function(x) cfg.name.showUser = x end)
+box:AddToggle("Username", cfg.name.user, function(x) cfg.name.user = x end)
 box:AddToggle("Name Shadow", cfg.name.shadow, function(x) cfg.name.shadow = x end)
 box:AddSlider("Name Size", 8, 22, cfg.name.size, 0, function(n) cfg.name.size = n end)
 box:AddColorPicker("Name Color", cfg.name.color, function(c) cfg.name.color = c end)
@@ -113,12 +114,35 @@ lines:AddSlider("Backtrack Ticks", 2, 20, cfg.trail.ticks, 0, function(n) cfg.tr
 local worldTab = UI:CreatePanel("World Visuals", { Width = 260, Open = false })
 worldTab:AddSeparator("Range Rings")
 worldTab:AddToggle("Rings On Enemies", cfg.rings.onEnemies, function(x) cfg.rings.on = x cfg.rings.onEnemies = x end)
-worldTab:AddDropdown("Ring 1 Shape", { "circle", "square", "pentagon", "hexagon", "star", "radar" }, cfg.rings.specs[1].shape, function(s) cfg.rings.specs[1].shape = s end)
-worldTab:AddDropdown("Ring 1 FX", { "none", "rainbow", "breathe" }, cfg.rings.specs[1].fx, function(s) cfg.rings.specs[1].fx = s end)
-worldTab:AddSlider("Ring 1 Radius", 1, 40, cfg.rings.specs[1].radius, 0, function(n) cfg.rings.specs[1].radius = n end)
-worldTab:AddToggle("Ring 1 Glow", cfg.rings.specs[1].glow, function(x) cfg.rings.specs[1].glow = x end)
-worldTab:AddSlider("Ring 1 Spin", 0, 3, cfg.rings.specs[1].spin, 1, function(n) cfg.rings.specs[1].spin = n end)
-worldTab:AddColorPicker("Ring 1 Color", cfg.rings.specs[1].color, function(c) cfg.rings.specs[1].color = c end)
+worldTab:AddToggle("Rings On Me", cfg.self.rings, function(x) cfg.self.rings = x end)
+
+local ringIdx = 1
+local function ring() return cfg.rings.specs[ringIdx] end
+worldTab:AddSlider("Editing Ring #", 1, 8, 1, 0, function(n)
+	ringIdx = math.clamp(math.floor(n), 1, #cfg.rings.specs)
+end)
+worldTab:AddButton("Add Ring", function()
+	esp:addRingSpec({ radius = 8, color = Color3.fromRGB(90, 200, 255) })
+	ringIdx = #cfg.rings.specs
+	UI:Toast("EasyESP", "Ring " .. ringIdx .. " added", 2, "ok")
+end)
+worldTab:AddButton("Remove Current Ring", function()
+	if #cfg.rings.specs > 1 then
+		esp:removeRingSpec(ringIdx)
+		ringIdx = math.clamp(ringIdx, 1, #cfg.rings.specs)
+	end
+end)
+worldTab:AddDropdown("Ring Shape", { "circle", "square", "pentagon", "hexagon", "star", "radar" }, ring().shape, function(s) local r = ring(); if r then r.shape = s end end)
+worldTab:AddDropdown("Ring Style", { "solid", "dashed" }, ring().style, function(s) local r = ring(); if r then r.style = s end end)
+worldTab:AddDropdown("Ring FX", { "none", "rainbow", "breathe" }, ring().fx, function(s) local r = ring(); if r then r.fx = s end end)
+worldTab:AddSlider("Ring Radius", 1, 40, ring().radius, 0, function(n) local r = ring(); if r then r.radius = n end end)
+worldTab:AddSlider("Ring Thickness", 1, 6, ring().thickness, 0, function(n) local r = ring(); if r then r.thickness = n end end)
+worldTab:AddSlider("Ring Spin", 0, 3, ring().spin, 1, function(n) local r = ring(); if r then r.spin = n end end)
+worldTab:AddToggle("Ring Glow", ring().glow, function(x) local r = ring(); if r then r.glow = x end end)
+worldTab:AddToggle("Ring Pulse", ring().pulse, function(x) local r = ring(); if r then r.pulse = x end end)
+worldTab:AddToggle("Ring Fill", ring().fill, function(x) local r = ring(); if r then r.fill = x end end)
+worldTab:AddSlider("Ring Ticks", 0, 24, ring().ticks, 0, function(n) local r = ring(); if r then r.ticks = math.floor(n) end end)
+worldTab:AddColorPicker("Ring Color", ring().color, function(c) local r = ring(); if r then r.color = c end end)
 
 worldTab:AddSeparator("Sphere")
 worldTab:AddToggle("Sphere On Enemies", cfg.ball.onEnemies, function(x) cfg.ball.on = x cfg.ball.onEnemies = x end)
@@ -130,7 +154,6 @@ worldTab:AddColorPicker("Sphere Color", cfg.ball.color, function(c) cfg.ball.col
 local mine = UI:CreatePanel("My Player", { Width = 250, Open = true })
 mine:AddLabel("Effects & rings on YOU (also enemies below)")
 mine:AddToggle("Effects On Me", cfg.self.fx, function(x) cfg.self.fx = x end)
-mine:AddToggle("Rings On Me", cfg.self.rings, function(x) cfg.self.rings = x end)
 mine:AddToggle("Also On Enemies", cfg.fx.onEnemies, function(x) cfg.fx.onEnemies = x end)
 mine:AddSlider("FX Density", 0.1, 1, cfg.perf.fxDensity, 2, function(n) cfg.perf.fxDensity = n end)
 
@@ -176,7 +199,6 @@ perf:AddSlider("Frame Skip", 0, 4, cfg.perf.frameSkip, 0, function(n) cfg.perf.f
 perf:AddSlider("LOD Near", 40, 300, cfg.perf.near, 0, function(n) cfg.perf.near = n end)
 perf:AddSlider("LOD Mid", 150, 600, cfg.perf.mid, 0, function(n) cfg.perf.mid = n end)
 perf:AddSlider("LOD Far", 400, 1500, cfg.perf.far, 0, function(n) cfg.perf.far = n end)
-perf:AddToggle("Labels Only Far", cfg.perf.labelsOnlyFar, function(x) cfg.perf.labelsOnlyFar = x end)
 perf:AddToggle("Drop FX Far", cfg.perf.dropFxFar, function(x) cfg.perf.dropFxFar = x end)
 
 local cham = UI:CreatePanel("Chams & World", { Width = 240, Open = false })
