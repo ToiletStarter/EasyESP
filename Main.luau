@@ -1,2828 +1,1718 @@
-local Players            = game:GetService("Players")
-local RunService         = game:GetService("RunService")
-local Lighting           = game:GetService("Lighting")
-local UserInputService   = game:GetService("UserInputService")
-
-local LocalPlayer = Players.LocalPlayer
-local Camera      = workspace.CurrentCamera
-
-workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
-	Camera = workspace.CurrentCamera
-end)
-
-local Vector2new     = Vector2.new
-local Vector3new     = Vector3.new
-local Color3fromRGB  = Color3.fromRGB
-local Color3fromHSV  = Color3.fromHSV
-local Color3new      = Color3.new
-local CFramenew      = CFrame.new
-local mathclamp      = math.clamp
-local mathhuge       = math.huge
-local mathatan2      = math.atan2
-local mathcos        = math.cos
-local mathsin        = math.sin
-local mathmin        = math.min
-local mathmax        = math.max
-local mathfloor      = math.floor
-local tableinsert    = table.insert
-local tableremove    = table.remove
-
-local EasyESP = {}
-EasyESP.__index = EasyESP
-EasyESP.Version = "1.0.0"
-
-EasyESP.Defaults = {
-	Master      = false,
-	MaxDist     = 3000,
-	RefreshRate = 0,
-
-	ESP = {
-		Enabled      = false,
-		TeamCheck    = false,
-		VisibleCheck = false,
-		VisibleColor      = false,
-		VisibleColorOn    = Color3fromRGB(0, 255, 0),
-		VisibleColorOff   = Color3fromRGB(255, 0, 0),
-
-		Boxes        = false,
-		BoxStyle     = "2D",
-		BoxColor     = Color3fromRGB(255, 255, 255),
-		BoxOutline   = true,
-		BoxFill      = false,
-		BoxFillAlpha = 0.2,
-		BoxThickness = 1,
-
-		Names        = false,
-		Usernames    = false,
-		Distance     = false,
-		Tool         = false,
-		TextSize     = 13,
-		TextColor    = Color3fromRGB(255, 255, 255),
-		TextOutline  = true,
-		TextFont     = 2,
-
-		HealthBar        = false,
-		HealthBarGradient= true,
-		BarThickness     = 2,
-		BarOutline       = false,
-
-		Skeletons     = false,
-		SkeletonColor = Color3fromRGB(255, 255, 255),
-
-		HeadDot     = false,
-		HeadDotSize = 3,
-
-		LookLines = false,
-		LookLen   = 10,
-
-		Tracers      = false,
-		TracerOrigin = "Bottom",
-		TracerColor  = Color3fromRGB(255, 255, 255),
-
-		Arrows      = false,
-		ArrowRadius = 200,
-		ArrowSize   = 15,
-
-		Rainbow      = false,
-		RainbowSpeed = 1,
-	},
-
-	Chams = {
-		Enabled          = false,
-		Mode             = "Highlight",
-
-		Fill             = true,
-		FillColor        = Color3fromRGB(255, 255, 255),
-		FillTransparency = 0.5,
-
-		Outline          = true,
-		OutlineColor     = Color3fromRGB(255, 255, 255),
-		OutlineTransparency = 0,
-
-		DepthMode        = "AlwaysOnTop",
-
-		Material         = "ForceField",
-		MaterialColor    = Color3fromRGB(255, 255, 255),
-		MaterialTransparency = 0,
-		MaterialAffectHead = true,
-
-		TeamCheck        = false,
-		UseVisibleColor  = false,
-		VisibleColor     = Color3fromRGB(0, 255, 0),
-		HiddenColor      = Color3fromRGB(255, 0, 0),
-	},
-
-	World = {
-		Enabled         = false,
-		Fullbright      = false,
-		FOV             = 70,
-		NoFog           = false,
-		Brightness      = 1,
-		Ambient         = Color3fromRGB(0, 0, 0),
-		OutdoorAmbient  = Color3fromRGB(0, 0, 0),
-		Exposure        = 1,
-		ColorCorrection = false,
-		Saturation      = 0,
-		Contrast        = 0,
-	},
-
-	Visuals = {
-		Enabled = false,
-
-		Box = {
-			Enabled     = true,
-			Style       = "Corner",
-			Color       = Color3fromRGB(200, 60, 220),
-			Thickness   = 1,
-			Outline     = true,
-			OutlineColor= Color3fromRGB(10, 10, 12),
-			CornerScale = 0.28,
-			Fill        = false,
-			FillColor   = Color3fromRGB(200, 60, 220),
-			FillAlpha   = 0.12,
-			FillGradient= true,
-		},
-
-		Glow = {
-			Enabled   = true,
-			Color     = Color3fromRGB(200, 60, 220),
-			Layers    = 4,
-			Spread    = 2,
-			Alpha     = 0.10,
-			Pulse     = true,
-			PulseSpeed= 3,
-		},
-
-		Name = {
-			Enabled  = true,
-			Size     = 13,
-			Color    = Color3fromRGB(235, 235, 245),
-			Font     = 2,
-			Outline  = true,
-			Shadow   = true,
-			ShowUser = false,
-		},
-
-		Weapon = {
-			Enabled  = true,
-			Size     = 12,
-			Color    = Color3fromRGB(200, 200, 210),
-			Font     = 2,
-			Outline  = true,
-			ShowAmmo = true,
-			AmmoAttribute = "Ammo",
-		},
-
-		Distance = {
-			Enabled = true,
-			Size    = 11,
-			Color   = Color3fromRGB(180, 180, 190),
-			Font    = 2,
-			Outline = true,
-			Suffix  = "m",
-		},
-
-		HealthBar = {
-			Enabled   = true,
-			Side      = "Left",
-			Thickness = 3,
-			Outline   = true,
-			Gradient  = true,
-			ColorFull = Color3fromRGB(80, 230, 120),
-			ColorLow  = Color3fromRGB(230, 60, 60),
-			ShowText  = true,
-			Notch     = true,
-		},
-
-		ArmorBar = {
-			Enabled   = false,
-			Side      = "Bottom",
-			Thickness = 3,
-			Color     = Color3fromRGB(90, 160, 255),
-			Outline   = true,
-			Attribute = "Armor",
-			MaxAttribute = "MaxArmor",
-		},
-
-		Flags = {
-			Enabled   = true,
-			Size      = 11,
-			Font      = 2,
-			Outline   = true,
-			Side      = "Right",
-			Spacing   = 1,
-			DefaultColor = Color3fromRGB(220, 220, 230),
-		},
-
-		HitMarker = {
-			Enabled   = true,
-			Duration  = 0.35,
-			FlashColor= Color3fromRGB(255, 255, 255),
-			Damage    = true,
-			DamageColor = Color3fromRGB(255, 90, 90),
-		},
-
-		LowHealthPulse = {
-			Enabled   = true,
-			Threshold = 0.35,
-			Color     = Color3fromRGB(255, 40, 40),
-			Speed     = 6,
-		},
-
-		Backtrack = {
-			Enabled    = false,
-			Ticks      = 8,
-			Interval   = 0.05,
-			Color      = Color3fromRGB(200, 60, 220),
-			Alpha      = 0.5,
-			Skeleton   = true,
-			Box        = false,
-			FadeTail   = true,
-		},
-
-		Rings = {
-			Enabled   = false,
-			Segments  = 48,
-			Height    = 0.05,
-			DepthTest = true,
-			List = {
-				{ Name = "KillAura", Radius = 14, Color = Color3fromRGB(255, 70, 70),  Thickness = 2, Alpha = 1, Style = "Solid", Effect = "None",  Spin = 0.4, Pulse = false, Filled = false, FillAlpha = 0.08 },
-				{ Name = "Reach",    Radius = 6,  Color = Color3fromRGB(90, 200, 255),  Thickness = 2, Alpha = 1, Style = "Dashed", Effect = "None", Spin = 0,   Pulse = true,  Filled = false, FillAlpha = 0.08 },
-			},
-		},
-
-		Sphere = {
-			Enabled   = false,
-			Radius    = 10,
-			Rings     = 5,
-			Segments  = 24,
-			Color     = Color3fromRGB(200, 60, 220),
-			Thickness = 1,
-			Alpha     = 0.6,
-			DepthTest = true,
-			Spin      = 0.2,
-			Effect    = "None",
-		},
-
-		Effects = {
-			Confetti = {
-				Enabled = false,
-				Count   = 40,
-				Radius  = 8,
-				Height  = 12,
-				Speed   = 6,
-				Size    = 3,
-				Rainbow = true,
-				Color   = Color3fromRGB(255, 100, 200),
-			},
-			Rain = {
-				Enabled = false,
-				Count   = 60,
-				Radius  = 7,
-				Height  = 16,
-				Speed   = 24,
-				Length  = 1.2,
-				Color   = Color3fromRGB(120, 170, 255),
-				Alpha   = 0.6,
-				Rainbow = false,
-			},
-			Synth = {
-				Enabled  = false,
-				Rings    = 6,
-				Radius   = 12,
-				Spacing  = 1.4,
-				Height   = 0.0,
-				Speed    = 4,
-				Segments = 40,
-				Thickness= 1,
-				Alpha    = 0.7,
-				Hue      = 0.85,
-				HueRange = 0.25,
-				Rise     = true,
-			},
-			Orbit = {
-				Enabled  = false,
-				Count    = 3,
-				Radius   = 5,
-				Speed    = 2,
-				Size     = 4,
-				Color    = Color3fromRGB(200, 60, 220),
-				Vertical = 3,
-				Rainbow  = false,
-				Trail    = true,
-				TrailLen = 5,
-			},
-			Spiral = {
-				Enabled   = false,
-				Radius    = 6,
-				Height    = 10,
-				Turns     = 3,
-				Points    = 60,
-				Speed     = 2,
-				Thickness = 1,
-				Alpha     = 0.85,
-				Color     = Color3fromRGB(255, 120, 60),
-				Rainbow   = true,
-			},
-			Vortex = {
-				Enabled   = false,
-				Particles = 50,
-				Radius    = 8,
-				Height    = 12,
-				Speed     = 6,
-				Twist     = 3,
-				Size      = 3,
-				Color     = Color3fromRGB(120, 80, 255),
-				Rainbow   = true,
-			},
-			Shockwave = {
-				Enabled   = false,
-				Waves     = 3,
-				Radius    = 14,
-				Speed     = 4,
-				Segments  = 44,
-				Thickness = 2,
-				Alpha     = 0.8,
-				Color     = Color3fromRGB(255, 220, 120),
-			},
-			Aura = {
-				Enabled   = false,
-				Rings     = 4,
-				Radius    = 5,
-				Speed     = 2,
-				Segments  = 36,
-				Thickness = 1,
-				Alpha     = 0.7,
-				Color     = Color3fromRGB(90, 255, 200),
-				Rainbow   = true,
-			},
-			Fireflies = {
-				Enabled = false,
-				Count   = 24,
-				Radius  = 6,
-				Height  = 8,
-				Speed   = 4,
-				Size    = 2,
-				Color   = Color3fromRGB(255, 240, 150),
-				Rainbow = false,
-			},
-			Lightning = {
-				Enabled   = false,
-				Bolts     = 3,
-				Segments  = 6,
-				Radius    = 6,
-				Height    = 12,
-				Jitter    = 1.5,
-				Speed     = 6,
-				Thickness = 2,
-				Alpha     = 1,
-				Color     = Color3fromRGB(180, 220, 255),
-			},
-			Helix = {
-				Enabled   = false,
-				Strands   = 2,
-				Points    = 40,
-				Turns     = 2,
-				Radius    = 3,
-				Height    = 12,
-				Speed     = 2,
-				Thickness = 1,
-				Alpha     = 0.85,
-				Color     = Color3fromRGB(120, 255, 180),
-				Rainbow   = true,
-			},
-			Heartbeat = {
-				Enabled   = false,
-				Radius    = 8,
-				Segments  = 40,
-				Speed     = 1.2,
-				Thickness = 2,
-				Alpha     = 0.8,
-				Color     = Color3fromRGB(255, 60, 90),
-			},
-			Grid = {
-				Enabled = false,
-				Lines   = 6,
-				Size    = 10,
-				Speed   = 2,
-				Wave    = 1.2,
-				Alpha   = 0.4,
-				Color   = Color3fromRGB(80, 200, 255),
-			},
-			Tornado = {
-				Enabled   = false,
-				Particles = 60,
-				Radius    = 6,
-				Height    = 14,
-				Speed     = 6,
-				Spin      = 3,
-				Twist     = 2,
-				Size      = 2,
-				Color     = Color3fromRGB(180, 180, 200),
-				Rainbow   = false,
-			},
-			Portal = {
-				Enabled   = false,
-				Rings     = 5,
-				Radius    = 6,
-				Height    = 0.1,
-				Segments  = 40,
-				Speed     = 3,
-				Spin      = 1,
-				Thickness = 2,
-				Alpha     = 0.7,
-				Hue       = 0.75,
-			},
-			Snow = {
-				Enabled = false,
-				Count   = 50,
-				Radius  = 8,
-				Height  = 16,
-				Speed   = 4,
-				Size    = 1.5,
-				Alpha   = 0.9,
-				Color   = Color3fromRGB(255, 255, 255),
-			},
-			Embers = {
-				Enabled = false,
-				Count   = 40,
-				Radius  = 5,
-				Height  = 12,
-				Speed   = 5,
-				Size    = 2,
-			},
-			Radar = {
-				Enabled   = false,
-				Radius    = 14,
-				Segments  = 40,
-				Speed     = 2,
-				ArcLen    = 1.2,
-				Thickness = 2,
-				Alpha     = 0.8,
-				Color     = Color3fromRGB(80, 255, 120),
-			},
-			StarBurst = {
-				Enabled     = false,
-				OuterRadius = 6,
-				InnerRadius = 2.5,
-				Points      = 5,
-				Spin        = 1,
-				Thickness   = 2,
-				Alpha       = 0.9,
-				Color       = Color3fromRGB(255, 220, 90),
-				Rainbow     = true,
-			},
-		},
-
-		TeamCheck    = false,
-		VisibleCheck = false,
-		Rainbow      = false,
-		RainbowSpeed = 1,
-
-		Preview = {
-			Enabled  = false,
-			X        = 60,
-			Y        = 0,
-			Width    = 70,
-			Height   = 150,
-			FakeHealth = -1,
-		},
-
-		Trail = {
-			Enabled   = false,
-			Length    = 30,
-			Interval  = 0.05,
-			Thickness = 2,
-			Alpha     = 0.8,
-			Color     = Color3fromRGB(200, 60, 220),
-			Rainbow   = true,
-		},
-
-		FovCircle = {
-			Enabled   = false,
-			Radius    = 120,
-			Thickness = 1,
-			Sides     = 64,
-			Alpha     = 1,
-			Color     = Color3fromRGB(255, 255, 255),
-			Rainbow   = false,
-			Filled    = false,
-			FillAlpha = 0.05,
-		},
-
-		Crosshair = {
-			Enabled   = false,
-			Gap       = 4,
-			Length    = 8,
-			Thickness = 1,
-			Alpha     = 1,
-			Color     = Color3fromRGB(0, 255, 120),
-			Rainbow   = false,
-			Outline   = true,
-			Dot       = false,
-			DotSize   = 1,
-		},
-	},
-}
-
-local BONES = {
-	R15 = {
-		{"Head", "UpperTorso"}, {"UpperTorso", "LowerTorso"},
-		{"UpperTorso", "LeftUpperArm"}, {"LeftUpperArm", "LeftLowerArm"}, {"LeftLowerArm", "LeftHand"},
-		{"UpperTorso", "RightUpperArm"}, {"RightUpperArm", "RightLowerArm"}, {"RightLowerArm", "RightHand"},
-		{"LowerTorso", "LeftUpperLeg"}, {"LeftUpperLeg", "LeftLowerLeg"}, {"LeftLowerLeg", "LeftFoot"},
-		{"LowerTorso", "RightUpperLeg"}, {"RightUpperLeg", "RightLowerLeg"}, {"RightLowerLeg", "RightFoot"},
-	},
-	R6 = {
-		{"Head", "Torso"}, {"Torso", "Left Arm"}, {"Torso", "Right Arm"},
-		{"Torso", "Left Leg"}, {"Torso", "Right Leg"},
-	},
-}
-
-local BOX_OFFSETS = {
-	Vector3new(-1, 1, -1), Vector3new(1, 1, -1), Vector3new(1, 1, 1), Vector3new(-1, 1, 1),
-	Vector3new(-1, -1, -1), Vector3new(1, -1, -1), Vector3new(1, -1, 1), Vector3new(-1, -1, 1),
-}
-
-local BOX_EDGES = {
-	{1, 2}, {2, 3}, {3, 4}, {4, 1},
-	{5, 6}, {6, 7}, {7, 8}, {8, 5},
-	{1, 5}, {2, 6}, {3, 7}, {4, 8},
-}
-
-local EMPTY = setmetatable({}, { __newindex = function() end })
-local TAU = 6.2831853071796
-
-local function hueShift(base, amt)
-	local h, s, v = base:ToHSV()
-	return Color3fromHSV((h + amt) % 1, s, v)
+if not Drawing or not setrenderproperty or not cleardrawcache then
+	error("EasyESP requires the Potassium executor (Drawing / setrenderproperty API missing)", 2)
 end
 
-function EasyESP.new()
-	local self = setmetatable({}, EasyESP)
-	self._ringBuf = {}
+local Players    = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Lighting   = game:GetService("Lighting")
+local Input      = game:GetService("UserInputService")
+local HttpJson   = game:GetService("HttpService")
 
-	self.Settings = EasyESP.DeepCopy(nil, EasyESP.Defaults)
+local me  = Players.LocalPlayer
+local cam = workspace.CurrentCamera
+workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+	cam = workspace.CurrentCamera
+end)
 
-	self.State = {
-		Active          = false,
-		Drawings        = {},
-		Connections     = {},
-		Highlights      = {},
-		MaterialChams   = {},
-		Objects         = {},
-		PlayerCallbacks = {},
-		LastUpdate      = 0,
-		RainbowVal      = 0,
-		WorldApplied    = false,
-		WorldOriginal   = nil,
-		Clock           = 0,
-		HitMarkers      = {},
-		Backtrack       = {},
-		LastHealth      = {},
-		FlagProviders   = {},
-		Seen            = {},
-		PrevSeen        = {},
-		RangeRings      = {},
-		Particles       = {},
-		LocalTrail      = {},
+local v2, v3 = Vector2.new, Vector3.new
+local cnew   = CFrame.new
+local rgb, hsv, rawc = Color3.fromRGB, Color3.fromHSV, Color3.new
+local clamp, floor, sqrt, sin, cos, atan2, huge, pi =
+	math.clamp, math.floor, math.sqrt, math.sin, math.cos, math.atan2, math.huge, math.pi
+local insert, remove, sort = table.insert, table.remove, table.sort
+local sp = setrenderproperty
+local TAU = pi * 2
+
+local FONTS = Drawing.Fonts
+local BLACK = rawc(0, 0, 0)
+
+local function hueAt(t)
+	return hsv(t % 1, 1, 1)
+end
+
+local RIG15 = {
+	{"Head","UpperTorso"},{"UpperTorso","LowerTorso"},
+	{"UpperTorso","LeftUpperArm"},{"LeftUpperArm","LeftLowerArm"},{"LeftLowerArm","LeftHand"},
+	{"UpperTorso","RightUpperArm"},{"RightUpperArm","RightLowerArm"},{"RightLowerArm","RightHand"},
+	{"LowerTorso","LeftUpperLeg"},{"LeftUpperLeg","LeftLowerLeg"},{"LeftLowerLeg","LeftFoot"},
+	{"LowerTorso","RightUpperLeg"},{"RightUpperLeg","RightLowerLeg"},{"RightLowerLeg","RightFoot"},
+}
+local RIG6 = {
+	{"Head","Torso"},{"Torso","Left Arm"},{"Torso","Right Arm"},
+	{"Torso","Left Leg"},{"Torso","Right Leg"},
+}
+
+local CORNERS = {
+	v3(-1, 1,-1), v3(1, 1,-1), v3(1, 1,1), v3(-1, 1,1),
+	v3(-1,-1,-1), v3(1,-1,-1), v3(1,-1,1), v3(-1,-1,1),
+}
+local EDGES = {
+	{1,2},{2,3},{3,4},{4,1},{5,6},{6,7},{7,8},{8,5},{1,5},{2,6},{3,7},{4,8},
+}
+
+
+local Pool = {}
+Pool.__index = Pool
+
+function Pool.new()
+	return setmetatable({
+		bank   = {},
+		live   = {},
+		wasLive= {},
+	}, Pool)
+end
+
+function Pool:grab(key, kind)
+	local d = self.bank[key]
+	if not d then
+		d = Drawing.new(kind)
+		self.bank[key] = d
+	end
+	self.live[key] = true
+	return d
+end
+
+function Pool:openFrame()
+	local live = self.live
+	for k in pairs(live) do live[k] = nil end
+end
+
+function Pool:closeFrame()
+	local live, was, bank = self.live, self.wasLive, self.bank
+	for k in pairs(was) do
+		if not live[k] then
+			bank[k].Visible = false
+		end
+	end
+	self.wasLive, self.live = live, was
+end
+
+function Pool:nuke()
+	cleardrawcache()
+	self.bank, self.live, self.wasLive = {}, {}, {}
+end
+
+function Pool:line(key, ax, ay, bx, by, color, thick, alpha, z)
+	local d = self:grab(key, "Line")
+	sp(d, "Visible", true)
+	sp(d, "From", v2(ax, ay))
+	sp(d, "To", v2(bx, by))
+	sp(d, "Color", color)
+	sp(d, "Thickness", thick or 1)
+	sp(d, "Transparency", alpha or 1)
+	if z then sp(d, "ZIndex", z) end
+	return d
+end
+
+function Pool:rect(key, x, y, w, h, color, filled, thick, alpha, z)
+	local d = self:grab(key, "Square")
+	sp(d, "Visible", true)
+	sp(d, "Position", v2(x, y))
+	sp(d, "Size", v2(w, h))
+	sp(d, "Color", color)
+	sp(d, "Filled", filled == true)
+	sp(d, "Thickness", thick or 1)
+	sp(d, "Transparency", alpha or 1)
+	if z then sp(d, "ZIndex", z) end
+	return d
+end
+
+function Pool:dot(key, x, y, radius, color, filled, alpha, sides, z)
+	local d = self:grab(key, "Circle")
+	sp(d, "Visible", true)
+	sp(d, "Position", v2(x, y))
+	sp(d, "Radius", radius)
+	sp(d, "Color", color)
+	sp(d, "Filled", filled ~= false)
+	sp(d, "NumSides", sides or 24)
+	sp(d, "Transparency", alpha or 1)
+	if z then sp(d, "ZIndex", z) end
+	return d
+end
+
+function Pool:tri(key, ax, ay, bx, by, cx, cy, color, alpha, z)
+	local d = self:grab(key, "Triangle")
+	sp(d, "Visible", true)
+	sp(d, "PointA", v2(ax, ay))
+	sp(d, "PointB", v2(bx, by))
+	sp(d, "PointC", v2(cx, cy))
+	sp(d, "Color", color)
+	sp(d, "Filled", true)
+	sp(d, "Transparency", alpha or 1)
+	if z then sp(d, "ZIndex", z) end
+	return d
+end
+
+function Pool:quad(key, ax, ay, bx, by, cx, cy, dx, dy, color, filled, thick, alpha, z)
+	local d = self:grab(key, "Quad")
+	sp(d, "Visible", true)
+	sp(d, "PointA", v2(ax, ay))
+	sp(d, "PointB", v2(bx, by))
+	sp(d, "PointC", v2(cx, cy))
+	sp(d, "PointD", v2(dx, dy))
+	sp(d, "Color", color)
+	sp(d, "Filled", filled == true)
+	sp(d, "Thickness", thick or 1)
+	sp(d, "Transparency", alpha or 1)
+	if z then sp(d, "ZIndex", z) end
+	return d
+end
+
+function Pool:text(key, str, x, y, size, color, centered, font, outlined, z)
+	local d = self:grab(key, "Text")
+	sp(d, "Visible", true)
+	sp(d, "Text", str)
+	sp(d, "Position", v2(x, y))
+	sp(d, "Size", size)
+	sp(d, "Color", color)
+	sp(d, "Center", centered ~= false)
+	sp(d, "Outline", outlined ~= false)
+	sp(d, "OutlineColor", BLACK)
+	sp(d, "Font", font or FONTS.Plex)
+	if z then sp(d, "ZIndex", z) end
+	return d
+end
+
+local function palette()
+	return {
+		accent  = rgb(190, 70, 235),
+		visible = rgb(90, 235, 130),
+		hidden  = rgb(235, 70, 70),
+		text    = rgb(235, 235, 245),
+		ink     = rgb(12, 12, 16),
 	}
+end
 
-	self.RaycastParams = RaycastParams.new()
-	self.RaycastParams.FilterType = Enum.RaycastFilterType.Exclude
+local function baseConfig()
+	local p = palette()
+	return {
+		enabled  = false,
+		maxRange = 3000,
+		refresh  = 0,
+		teamCheck   = false,
+		wallCheck   = false,
+		wallHide    = false,
+		wallColors  = false,
+		rainbow     = false,
+		rainbowRate = 1,
 
-	self.GetTool = function(plr)
-		local char = plr.Character
-		local tool = char and char:FindFirstChildOfClass("Tool")
-		return tool and tool.Name or "None"
+		perf = {
+			mode       = "auto",
+			playerCap  = 0,
+			ringDetail = 48,
+			ballDetail = 24,
+			fxDensity  = 1,
+			near       = 120,
+			mid        = 320,
+			far        = 700,
+			labelsOnlyFar = true,
+			dropFxFar  = true,
+			frameSkip  = 0,
+		},
+
+		box = {
+			on = true, style = "corner",
+			color = p.accent, thickness = 1,
+			outline = true, cornerScale = 0.28,
+			fill = false, fillColor = p.accent, fillAlpha = 0.12,
+		},
+		glow = { on = false, color = p.accent, layers = 4, spread = 2, alpha = 0.10, pulse = true, rate = 3 },
+		name = { on = true, size = 13, color = p.text, font = FONTS.Plex, shadow = true, showUser = false },
+		gun  = { on = false, size = 12, color = rgb(205, 205, 215), ammoAttr = "Ammo" },
+		dist = { on = false, size = 11, color = rgb(180, 180, 190), suffix = "m" },
+
+		hp = {
+			on = true, side = "left", thickness = 3, outline = true,
+			full = rgb(90, 235, 120), low = rgb(235, 70, 70),
+			gradient = true, showText = false, notch = true,
+		},
+		armor = { on = false, thickness = 3, color = rgb(95, 160, 255), attr = "Armor", maxAttr = "MaxArmor" },
+
+		flags = { on = false, size = 11, font = FONTS.Plex, side = "right", spacing = 1, color = p.text },
+
+		bones   = { on = false, color = p.text, thickness = 1 },
+		headDot = { on = false, size = 3, color = p.text },
+		gaze    = { on = false, length = 10, color = p.text },
+		tracer  = { on = false, from = "bottom", color = p.accent, thickness = 1 },
+		arrow   = { on = false, radius = 200, size = 15, color = p.accent },
+
+		hit   = { on = false, life = 0.35, flash = rawc(1,1,1), showDmg = true, dmgColor = rgb(255, 90, 90) },
+		pulse = { on = false, threshold = 0.35, color = rgb(255, 45, 45), rate = 6 },
+		trail = { on = false, ticks = 8, gap = 0.05, color = p.accent, alpha = 0.5, fade = true },
+
+		rings = {
+			on = false, onEnemies = false,
+			specs = {
+				{ radius = 14, color = rgb(255, 70, 70), thickness = 2, style = "solid", shape = "circle", fx = "none", spin = 0.4, pulse = false, fill = false, fillAlpha = 0.08, glow = false, ticks = 0 },
+				{ radius = 6,  color = rgb(90, 200, 255), thickness = 2, style = "dashed", shape = "circle", fx = "none", spin = 0, pulse = true, fill = false, fillAlpha = 0.08, glow = false, ticks = 0 },
+			},
+		},
+		ball = { on = false, onEnemies = false, radius = 10, rings = 5, color = p.accent, thickness = 1, alpha = 0.6, spin = 0.2, fx = "none" },
+
+		fx = {
+			onEnemies = true,
+			confetti  = { on = false, count = 40, radius = 8, height = 12, speed = 6, size = 3, rainbow = true, color = rgb(255, 100, 200) },
+			rain      = { on = false, count = 60, radius = 7, height = 16, speed = 24, length = 1.2, color = rgb(120, 170, 255), alpha = 0.6, rainbow = false },
+			synth     = { on = false, rings = 6, radius = 12, speed = 4, sides = 40, thickness = 1, alpha = 0.7, hue = 0.85, hueSpan = 0.25, rise = true },
+			orbit     = { on = false, count = 3, radius = 5, speed = 2, size = 4, color = p.accent, lift = 3, rainbow = false, trail = true, trailLen = 5 },
+			spiral    = { on = false, radius = 6, height = 10, turns = 3, points = 60, speed = 2, thickness = 1, alpha = 0.85, color = rgb(255, 120, 60), rainbow = true },
+			vortex    = { on = false, count = 50, radius = 8, height = 12, speed = 6, twist = 3, size = 3, color = rgb(120, 80, 255), rainbow = true },
+			shock     = { on = false, waves = 3, radius = 14, speed = 4, sides = 44, thickness = 2, alpha = 0.8, color = rgb(255, 220, 120) },
+			aura      = { on = false, rings = 4, radius = 5, speed = 2, sides = 36, thickness = 1, alpha = 0.7, color = rgb(90, 255, 200), rainbow = true },
+			flies     = { on = false, count = 24, radius = 6, height = 8, speed = 4, size = 2, color = rgb(255, 240, 150), rainbow = false },
+			bolt      = { on = false, count = 3, segs = 6, radius = 6, height = 12, jitter = 1.5, speed = 6, thickness = 2, alpha = 1, color = rgb(180, 220, 255) },
+			helix     = { on = false, strands = 2, points = 40, turns = 2, radius = 3, height = 12, speed = 2, thickness = 1, alpha = 0.85, color = rgb(120, 255, 180), rainbow = true },
+			pulse     = { on = false, radius = 8, sides = 40, speed = 1.2, thickness = 2, alpha = 0.8, color = rgb(255, 60, 90) },
+			tornado   = { on = false, count = 60, radius = 6, height = 14, speed = 6, spin = 3, twist = 2, size = 2, color = rgb(180, 180, 200), rainbow = false },
+			portal    = { on = false, rings = 5, radius = 6, sides = 40, speed = 3, spin = 1, thickness = 2, alpha = 0.7, hue = 0.75 },
+			snow      = { on = false, count = 50, radius = 8, height = 16, speed = 4, size = 1.5, alpha = 0.9, color = rawc(1,1,1) },
+			embers    = { on = false, count = 40, radius = 5, height = 12, speed = 5, size = 2 },
+			radar     = { on = false, radius = 14, sides = 40, speed = 2, arc = 1.2, thickness = 2, alpha = 0.8, color = rgb(80, 255, 120) },
+			burst     = { on = false, outer = 6, inner = 2.5, points = 5, spin = 1, thickness = 2, alpha = 0.9, color = rgb(255, 220, 90), rainbow = true },
+		},
+
+		self = {
+			trail   = { on = false, ticks = 30, gap = 0.05, thickness = 2, alpha = 0.8, color = p.accent, rainbow = true },
+			fov     = { on = false, radius = 120, thickness = 1, sides = 64, alpha = 1, color = rawc(1,1,1), rainbow = false, fill = false, fillAlpha = 0.05 },
+			cross   = { on = false, gap = 4, length = 8, thickness = 1, alpha = 1, color = rgb(0, 255, 120), rainbow = false, outline = true, dot = false, dotSize = 1 },
+			preview = { on = false, x = 60, y = 0, w = 70, h = 150, fakeHp = -1 },
+		},
+
+		chams = {
+			on = false, mode = "highlight", teamCheck = false,
+			depth = "top",
+			fill = true, fillColor = rawc(1,1,1), fillAlpha = 0.5,
+			outline = true, outlineColor = rawc(1,1,1), outlineAlpha = 0,
+			material = "ForceField", matColor = rawc(1,1,1), matAlpha = 0, matHead = true,
+			wallColors = false, visible = rgb(0, 255, 0), hidden = rgb(255, 0, 0),
+		},
+
+		world = {
+			on = false, fullbright = false, fov = 70, noFog = false,
+			brightness = 1, ambient = BLACK, outdoor = BLACK,
+			exposure = 1, colorGrade = false, saturation = 0, contrast = 0,
+		},
+	}
+end
+
+local RING_PRESETS = {
+	killaura = { radius = 14, color = rgb(255, 70, 70), thickness = 2, style = "solid", spin = 0.4, glow = true, ticks = 12, tickLen = 0.8 },
+	reach    = { radius = 6, color = rgb(90, 200, 255), thickness = 2, style = "dashed", pulse = true },
+	grab     = { radius = 4, color = rgb(90, 255, 150), thickness = 2, style = "solid", fill = true, fillAlpha = 0.1 },
+	rainbow  = { radius = 12, color = rawc(1,1,1), thickness = 3, fx = "rainbow", spin = 1, glow = true },
+	neon     = { radius = 10, color = rgb(190, 70, 235), thickness = 2, glow = true, glowAlpha = 0.5, pulse = true },
+	target   = { radius = 8, color = rgb(255, 160, 40), thickness = 2, shape = "radar", spin = 2 },
+}
+
+local function deepClone(src)
+	local out = {}
+	for k, val in pairs(src) do
+		local tv = typeof(val)
+		if type(val) == "table" and tv ~= "Color3" and tv ~= "Vector3" and tv ~= "Vector2" then
+			out[k] = deepClone(val)
+		else
+			out[k] = val
+		end
+	end
+	return out
+end
+
+local function merge(into, from)
+	for k, val in pairs(from) do
+		if type(val) == "table" and type(into[k]) == "table" and typeof(val) ~= "Color3" then
+			merge(into[k], val)
+		else
+			into[k] = val
+		end
+	end
+end
+
+local function jitter(seed)
+	local x = sin(seed * 127.1 + 311.7) * 43758.5453
+	return x - floor(x)
+end
+
+local ESP = {}
+ESP.__index = ESP
+ESP.version = "3.0.0"
+
+function ESP.new(overrides)
+	local self = setmetatable({}, ESP)
+	self.cfg = baseConfig()
+	if overrides then merge(self.cfg, overrides) end
+
+	self.pool = Pool.new()
+	self.ring = RaycastParams.new()
+	self.ring.FilterType = Enum.RaycastFilterType.Exclude
+
+	self.flagProviders = {}
+	self.entities  = {}
+	self.selfRings = {}
+	self.tagHooks  = {}
+
+	self.hl   = {}
+	self.mat  = {}
+	self.hits = {}
+	self.hpMem= {}
+	self.btrk = {}
+	self.myTrail = {}
+
+	self.running   = false
+	self.clock     = 0
+	self.frame     = 0
+	self.lastTick  = 0
+	self.worldSnap = nil
+	self.roster    = {}
+	self.rosterN   = 0
+
+	self.gunOf = function(plr)
+		local rig = plr.Character
+		local tool = rig and rig:FindFirstChildOfClass("Tool")
+		return tool and tool.Name
 	end
 
-	self:RegisterDefaultFlags()
-
+	self:installFlags()
 	return self
 end
 
-function EasyESP:DeepCopy(t)
+function ESP:project(worldPos)
+	local scr, onScreen = cam:WorldToViewportPoint(worldPos)
+	return scr.X, scr.Y, scr.Z, onScreen
+end
 
-	local copy = {}
-	for k, v in pairs(t) do
-		if type(v) == "table" then
-			copy[k] = EasyESP.DeepCopy(nil, v)
-		else
-			copy[k] = v
+function ESP:sees(part, rig)
+	local eye = cam.CFrame.Position
+	self.ring.FilterDescendantsInstances = { me.Character, rig }
+	return workspace:Raycast(eye, part.Position - eye, self.ring) == nil
+end
+
+function ESP:isAlly(plr)
+	return plr.Team ~= nil and plr.Team == me.Team
+end
+
+function ESP:screenBox(rig)
+	local pivot, size = rig:GetBoundingBox()
+	local half = size * 0.5
+	local lx, ly, hx, hy = huge, huge, -huge, -huge
+	for i = 1, 8 do
+		local x, y, depth = self:project((pivot * cnew(CORNERS[i] * half)).Position)
+		if depth <= 0 then return nil end
+		if x < lx then lx = x end
+		if y < ly then ly = y end
+		if x > hx then hx = x end
+		if y > hy then hy = y end
+	end
+	return lx, ly, hx - lx, hy - ly
+end
+
+function ESP:footOf(root, hum)
+	local drop = (hum and hum.HipHeight and hum.HipHeight > 0) and hum.HipHeight + 0.1 or 2.5
+	return root.Position - v3(0, drop, 0)
+end
+
+function ESP:lodOf(dist)
+	local perf = self.cfg.perf
+	if perf.mode == "off" then return 0 end
+	if dist <= perf.near then return 0 end
+	if dist <= perf.mid then return 1 end
+	if dist <= perf.far then return 2 end
+	return 3
+end
+
+local function scaleSides(base, lod)
+	if lod == 0 then return base end
+	if lod == 1 then return math.max(8, floor(base * 0.66)) end
+	if lod == 2 then return math.max(6, floor(base * 0.4)) end
+	return math.max(4, floor(base * 0.25))
+end
+
+function ESP:worldRing(key, cx, cy, cz, radius, sides, color, thick, alpha, spin, opt)
+	opt = opt or {}
+	sides = clamp(floor(sides), 6, 128)
+	spin = spin or 0
+	local buf = self._rbuf
+	if not buf then buf = {}; self._rbuf = buf end
+	local origin = v3(cx, cy, cz)
+
+	for i = 0, sides - 1 do
+		local a = (i / sides) * TAU + spin
+		local x, y, d = self:project(origin + v3(cos(a) * radius, 0, sin(a) * radius))
+		local slot = buf[i + 1]
+		if slot then slot[1], slot[2], slot[3] = x, y, d else buf[i + 1] = { x, y, d } end
+	end
+
+	local dashed, gap = opt.dashed, opt.gap or 2
+	local glow, glowA = opt.glow, opt.glowAlpha or alpha * 0.35
+	local fadeTo = opt.gradient
+	for i = 1, sides do
+		local a = buf[i]
+		local b = buf[(i % sides) + 1]
+		local shown = a[3] > 0 and b[3] > 0 and (not dashed or (i % gap == 0))
+		if shown then
+			local col = fadeTo and color:Lerp(fadeTo, i / sides) or color
+			self.pool:line(key .. i, a[1], a[2], b[1], b[2], col, thick, alpha)
+			if glow then self.pool:line(key .. "g" .. i, a[1], a[2], b[1], b[2], color, thick + 3, glowA) end
 		end
 	end
-	return copy
-end
 
-function EasyESP:GetDrawing(id, drawType)
-	local existing = self.State.Drawings[id]
-	if existing then
-		self.State.Seen[id] = true
-		return existing
-	end
-	local obj = Drawing.new(drawType)
-	self.State.Drawings[id] = obj
-	self.State.Seen[id] = true
-	return obj
-end
-
-function EasyESP:BeginFrame()
-	local seen = self.State.Seen
-	for k in pairs(seen) do seen[k] = nil end
-end
-
-function EasyESP:EndFrame()
-	local seen = self.State.Seen
-	local drawings = self.State.Drawings
-	local prev = self.State.PrevSeen
-	for id in pairs(prev) do
-		if not seen[id] then
-			local d = drawings[id]
-			if d then d.Visible = false end
+	if opt.filled then
+		local cxs, cys, cd = self:project(origin)
+		if cd > 0 then
+			for i = 1, sides do
+				local a, b = buf[i], buf[(i % sides) + 1]
+				if a[3] > 0 and b[3] > 0 then
+					self.pool:tri(key .. "f" .. i, cxs, cys, a[1], a[2], b[1], b[2], color, opt.fillAlpha or 0.08)
+				end
+			end
 		end
 	end
-	self.State.PrevSeen, self.State.Seen = seen, prev
 end
 
-function EasyESP:HideAll()
-	for _, v in pairs(self.State.Drawings) do
-		v.Visible = false
-	end
-	for k in pairs(self.State.Seen) do self.State.Seen[k] = nil end
-	for k in pairs(self.State.PrevSeen) do self.State.PrevSeen[k] = nil end
-end
-
-function EasyESP:W2S(pos)
-	local screenPos, onScreen = Camera:WorldToViewportPoint(pos)
-	return Vector2new(screenPos.X, screenPos.Y), screenPos.Z, onScreen
-end
-
-function EasyESP:IsVisible(part, model)
-	local origin = Camera.CFrame.Position
-	local dir = (part.Position - origin)
-	self.RaycastParams.FilterDescendantsInstances = { LocalPlayer.Character, model }
-	local result = workspace:Raycast(origin, dir, self.RaycastParams)
-	return result == nil
-end
-
-function EasyESP:IsTeamMate(player)
-	if not self.Settings.ESP.TeamCheck then return false end
-	return player.Team ~= nil and player.Team == LocalPlayer.Team
-end
-
-function EasyESP:GetBoundingBox(model)
-	local cf, size = model:GetBoundingBox()
-	local halfSize = size * 0.5
-	local minX, minY = mathhuge, mathhuge
-	local maxX, maxY = -mathhuge, -mathhuge
-	local allVisible = true
-
-	for _, offset in ipairs(BOX_OFFSETS) do
-		local worldPos = (cf * CFramenew(offset * halfSize)).Position
-		local screenPos, depth = self:W2S(worldPos)
-		if depth <= 0 then
-			allVisible = false
-			break
+function ESP:worldPoly(key, cx, cy, cz, radius, faces, color, thick, alpha, spin)
+	faces = clamp(floor(faces), 3, 16)
+	local origin = v3(cx, cy, cz)
+	local px, py, pd
+	for i = 0, faces do
+		local a = (i / faces) * TAU + (spin or 0)
+		local x, y, d = self:project(origin + v3(cos(a) * radius, 0, sin(a) * radius))
+		if px and pd > 0 and d > 0 then
+			self.pool:line(key .. i, px, py, x, y, color, thick, alpha)
 		end
-		if screenPos.X < minX then minX = screenPos.X end
-		if screenPos.Y < minY then minY = screenPos.Y end
-		if screenPos.X > maxX then maxX = screenPos.X end
-		if screenPos.Y > maxY then maxY = screenPos.Y end
+		px, py, pd = x, y, d
+	end
+end
+
+function ESP:worldStar(key, cx, cy, cz, outer, inner, points, color, thick, alpha, spin)
+	points = clamp(floor(points), 3, 12)
+	local origin = v3(cx, cy, cz)
+	local n = points * 2
+	local pts = {}
+	for i = 0, n - 1 do
+		local a = (i / n) * TAU + (spin or 0)
+		local r = (i % 2 == 0) and outer or inner
+		local x, y, d = self:project(origin + v3(cos(a) * r, 0, sin(a) * r))
+		pts[i + 1] = { x, y, d }
+	end
+	for i = 1, n do
+		local a, b = pts[i], pts[(i % n) + 1]
+		if a[3] > 0 and b[3] > 0 then
+			self.pool:line(key .. i, a[1], a[2], b[1], b[2], color, thick, alpha)
+		end
+	end
+end
+
+function ESP:worldSweep(key, cx, cy, cz, radius, angle, arc, sides, color, thick, alpha)
+	sides = clamp(floor(sides), 2, 32)
+	local origin = v3(cx, cy, cz)
+	local px, py, pd
+	for i = 0, sides do
+		local a = angle - arc + (i / sides) * arc
+		local x, y, d = self:project(origin + v3(cos(a) * radius, 0, sin(a) * radius))
+		if px and pd > 0 and d > 0 then
+			self.pool:line(key .. i, px, py, x, y, color, thick, alpha * (i / sides))
+		end
+		px, py, pd = x, y, d
+	end
+end
+
+function ESP:worldBall(key, cx, cy, cz, radius, bands, sides, color, thick, alpha, spin)
+	sides = clamp(floor(sides), 6, 64)
+	bands = clamp(floor(bands), 2, 16)
+	local origin = v3(cx, cy, cz)
+	local n = 0
+	local function span(pa, pb)
+		if pa and pa[3] > 0 and pb[3] > 0 then
+			n = n + 1
+			self.pool:line(key .. n, pa[1], pa[2], pb[1], pb[2], color, thick, alpha)
+		end
+	end
+	for r = 1, bands do
+		local frac = r / (bands + 1)
+		local y = (frac - 0.5) * 2 * radius
+		local rr = sqrt(math.max(radius * radius - y * y, 0))
+		local prev
+		for i = 0, sides do
+			local a = (i / sides) * TAU + spin
+			local x, yy, d = self:project(origin + v3(cos(a) * rr, y, sin(a) * rr))
+			local cur = { x, yy, d }
+			if prev then span(prev, cur) end
+			prev = cur
+		end
+	end
+	local mer = math.max(4, floor(sides / 4))
+	for m = 0, mer - 1 do
+		local ang = (m / mer) * pi + spin
+		local prev
+		for i = 0, sides do
+			local t = (i / sides) * TAU
+			local x, yy, d = self:project(origin + v3(cos(t) * radius * cos(ang), sin(t) * radius, cos(t) * radius * sin(ang)))
+			local cur = { x, yy, d }
+			if prev then span(prev, cur) end
+			prev = cur
+		end
+	end
+end
+
+function ESP:worldSpark(key, wx, wy, wz, size, color, alpha)
+	local x, y, d = self:project(v3(wx, wy, wz))
+	if d <= 0 then return false end
+	self.pool:dot(key, x, y, size, color, true, alpha or 1, 10)
+	return true
+end
+
+function ESP:paintRing(key, cx, cy, cz, ring, tint, lod)
+	local spin = self.clock * (ring.spin or 0)
+	local alpha = ring.alpha or 1
+	if ring.pulse then alpha = alpha * (0.55 + 0.45 * sin(self.clock * (ring.pulseRate or 3))) end
+
+	local color = ring.color
+	if ring.fx == "rainbow" then
+		color = hueAt(self.clock * 0.15 + (tint or 0) * 0.08)
+	elseif ring.fx == "breathe" then
+		color = ring.color:Lerp(ring.color2 or rawc(1,1,1), 0.5 + 0.5 * sin(self.clock * 2))
 	end
 
-	if not allVisible then return nil, nil, false end
+	local sides = scaleSides(ring.sides or self.cfg.perf.ringDetail, lod or 0)
+	local shape = ring.shape or "circle"
 
-	local w = maxX - minX
-	local h = maxY - minY
-	return Vector2new(minX, minY), Vector2new(w, h), true
-end
-
-function EasyESP:DrawText(id, text, pos, size, color, center, font, outline, outlineColor)
-	local t = self:GetDrawing(id, "Text")
-	t.Visible      = true
-	t.Text         = text
-	t.Position     = pos
-	t.Size         = size or self.Settings.ESP.TextSize
-	t.Color        = color or self.Settings.ESP.TextColor
-	t.Center       = center ~= false
-	t.Outline      = outline ~= false
-	t.OutlineColor = outlineColor or Color3new(0, 0, 0)
-	t.Font         = font or self.Settings.ESP.TextFont
-	return t
-end
-
-function EasyESP:DrawLine(id, from, to, color, thickness, transparency)
-	local l = self:GetDrawing(id, "Line")
-	l.Visible      = true
-	l.From         = from
-	l.To           = to
-	l.Color        = color or Color3new(1, 1, 1)
-	l.Thickness    = thickness or 1
-	l.Transparency = transparency or 1
-	return l
-end
-
-function EasyESP:DrawSquare(id, pos, size, color, filled, thickness, transparency)
-	local s = self:GetDrawing(id, "Square")
-	s.Visible      = true
-	s.Position     = pos
-	s.Size         = size
-	s.Color        = color or Color3new(1, 1, 1)
-	s.Filled       = filled == true
-	s.Thickness    = thickness or 1
-	s.Transparency = transparency or 1
-	return s
-end
-
-function EasyESP:DrawCircle(id, pos, radius, color, filled, thickness, transparency)
-	local c = self:GetDrawing(id, "Circle")
-	c.Visible      = true
-	c.Position     = pos
-	c.Radius       = radius
-	c.Color        = color or Color3new(1, 1, 1)
-	c.Filled       = filled == true
-	c.Thickness    = thickness or 1
-	c.Transparency = transparency or 1
-	return c
-end
-
-function EasyESP:DrawTriangle(id, p1, p2, p3, color, filled, thickness, transparency)
-	local t = self:GetDrawing(id, "Triangle")
-	t.Visible      = true
-	t.PointA       = p1
-	t.PointB       = p2
-	t.PointC       = p3
-	t.Color        = color or Color3new(1, 1, 1)
-	t.Filled       = filled == true
-	t.Thickness    = thickness or 1
-	t.Transparency = transparency or 1
-	return t
-end
-
-function EasyESP:DrawBar(id, boxX, boxY, boxH, pct, color, offset, thickness, outline)
-	local barW      = thickness or self.Settings.ESP.BarThickness
-	local offsetIdx = offset or 0
-	local xPos      = boxX - 5 - (offsetIdx * (barW + 3)) - barW
-	local barH      = boxH
-	pct = mathclamp(pct, 0, 1)
-
-	if outline then
-		local out = self:GetDrawing(id .. "_baro_" .. offsetIdx, "Square")
-		out.Visible      = true
-		out.Filled       = true
-		out.Color        = Color3new(0, 0, 0)
-		out.Transparency = 0.6
-		out.Position     = Vector2new(xPos - 1, boxY - 1)
-		out.Size         = Vector2new(barW + 2, barH + 2)
+	if shape == "square" then
+		return self:worldPoly(key, cx, cy, cz, ring.radius, 4, color, ring.thickness or 2, alpha, spin + 0.785)
+	elseif shape == "pentagon" then
+		return self:worldPoly(key, cx, cy, cz, ring.radius, 5, color, ring.thickness or 2, alpha, spin)
+	elseif shape == "hexagon" then
+		return self:worldPoly(key, cx, cy, cz, ring.radius, 6, color, ring.thickness or 2, alpha, spin)
+	elseif shape == "star" then
+		return self:worldStar(key, cx, cy, cz, ring.radius, ring.radius * 0.5, ring.starPoints or 5, color, ring.thickness or 2, alpha, spin)
+	elseif shape == "radar" then
+		self:worldRing(key .. "b", cx, cy, cz, ring.radius, sides, color, 1, alpha * 0.4, 0, nil)
+		return self:worldSweep(key .. "s", cx, cy, cz, ring.radius, self.clock * (ring.spin ~= 0 and ring.spin or 2), ring.arc or 1.2, 20, color, ring.thickness or 2, alpha)
 	end
 
-	local bg = self:GetDrawing(id .. "_barbg_" .. offsetIdx, "Square")
-	bg.Visible      = true
-	bg.Filled       = true
-	bg.Color        = Color3new(0.15, 0.15, 0.15)
-	bg.Transparency = 0.5
-	bg.Position     = Vector2new(xPos, boxY)
-	bg.Size         = Vector2new(barW, barH)
+	self:worldRing(key, cx, cy, cz, ring.radius, sides, color, ring.thickness or 2, alpha, spin, {
+		dashed = ring.style == "dashed",
+		gap = ring.dashGap or 2,
+		gradient = ring.gradient,
+		glow = ring.glow,
+		glowAlpha = ring.glowAlpha,
+		filled = ring.fill,
+		fillAlpha = ring.fillAlpha,
+	})
 
-	local fillH = barH * pct
-	local main  = self:GetDrawing(id .. "_bar_" .. offsetIdx, "Square")
-	main.Visible      = true
-	main.Filled       = true
-	main.Color        = color
-	main.Transparency = 1
-	main.Position     = Vector2new(xPos, boxY + (barH - fillH))
-	main.Size         = Vector2new(barW, mathmax(fillH, 1))
+	if ring.ticks and ring.ticks > 0 and (lod or 0) < 2 then
+		local origin = v3(cx, cy, cz)
+		for t = 0, ring.ticks - 1 do
+			local a = (t / ring.ticks) * TAU + spin
+			local ix, iy, id = self:project(origin + v3(cos(a) * ring.radius, 0, sin(a) * ring.radius))
+			local ox, oy, od = self:project(origin + v3(cos(a) * (ring.radius + (ring.tickLen or 0.6)), ring.tickUp or 0.4, sin(a) * (ring.radius + (ring.tickLen or 0.6))))
+			if id > 0 and od > 0 then
+				self.pool:line(key .. "t" .. t, ix, iy, ox, oy, color, ring.thickness or 2, alpha)
+			end
+		end
+	end
 end
 
-function EasyESP:AddPlayerCallback(name, callback)
-	self.State.PlayerCallbacks[name] = callback
+function ESP:attachRing(id, opt)
+	opt = opt or {}
+	local ring = deepClone(RING_PRESETS[opt.preset or "neon"])
+	merge(ring, opt)
+	ring.target = opt.target
+	ring.lift = opt.lift or 0
+	self.selfRings[id] = ring
+	return ring
 end
 
-function EasyESP:RemovePlayerCallback(name)
-	self.State.PlayerCallbacks[name] = nil
+function ESP:detachRing(id) self.selfRings[id] = nil end
+function ESP:clearRings() self.selfRings = {} end
+
+function ESP:centerOf(target)
+	if target == nil then
+		local rig = me.Character
+		local root = rig and rig:FindFirstChild("HumanoidRootPart")
+		local hum = rig and rig:FindFirstChildOfClass("Humanoid")
+		return root and self:footOf(root, hum) or nil
+	end
+	local kind = typeof(target)
+	if kind == "Vector3" then return target end
+	if kind == "function" then return target() end
+	if kind == "Instance" then
+		if target:IsA("Player") then
+			local rig = target.Character
+			local root = rig and rig:FindFirstChild("HumanoidRootPart")
+			local hum = rig and rig:FindFirstChildOfClass("Humanoid")
+			return root and self:footOf(root, hum) or nil
+		elseif target:IsA("BasePart") then
+			return target.Position - v3(0, target.Size.Y / 2, 0)
+		elseif target:IsA("Model") then
+			local base = target.PrimaryPart or target:FindFirstChildWhichIsA("BasePart")
+			return base and base.Position or nil
+		end
+	end
 end
 
-function EasyESP:RegisterObject(id, instance, renderCallback)
-	self.State.Objects[id] = {
-		Instance = instance,
-		Callback = renderCallback,
+function ESP:drawSelfRings()
+	local n = 0
+	for id, ring in pairs(self.selfRings) do
+		n = n + 1
+		local c = self:centerOf(ring.target)
+		if c then
+			c = c + v3(0, ring.lift or 0, 0)
+			self:paintRing("sr" .. id, c.X, c.Y, c.Z, ring, n, 0)
+		end
+	end
+end
+
+function ESP:addEntity(id, opt)
+	assert(opt and opt.get, "entity needs a .get returning an Instance or Vector3")
+	self.entities[id] = {
+		get      = opt.get,
+		label    = opt.label,
+		color    = opt.color or self.cfg.box.color,
+		box      = opt.box ~= false,
+		name     = opt.name ~= false,
+		distance = opt.distance == true,
+		tracer   = opt.tracer == true,
+		dot      = opt.dot == true,
+		ring     = opt.ring,
+		size     = opt.size or v3(3, 4, 3),
+		maxRange = opt.maxRange or self.cfg.maxRange,
+		draw     = opt.draw,
 	}
+	return self.entities[id]
 end
 
-function EasyESP:UnregisterObject(id)
-	local obj = self.State.Objects[id]
-	if obj then
+function ESP:removeEntity(id) self.entities[id] = nil end
 
-		for dId, d in pairs(self.State.Drawings) do
-			if type(dId) == "string" and dId:sub(1, #id) == id then
-				d.Visible = false
-			end
-		end
-	end
-	self.State.Objects[id] = nil
-end
-
-function EasyESP:Render3DBox(id, model, color, isCorner)
-	local cf, size = model:GetBoundingBox()
-	local halfSize = size * 0.5
-	local corners = {}
-	local allVisible = true
-
-	for i, offset in ipairs(BOX_OFFSETS) do
-		local wp = (cf * CFramenew(offset * halfSize)).Position
-		local pos, z = self:W2S(wp)
-		if z <= 0 then allVisible = false break end
-		corners[i] = pos
-	end
-
-	if not allVisible then
-		for i = 1, #BOX_EDGES do
-			local line = self:GetDrawing(id .. "_3d_" .. i, "Line")
-			line.Visible = false
-			if isCorner then
-				local line2 = self:GetDrawing(id .. "_3dc_" .. i, "Line")
-				line2.Visible = false
-			end
-		end
-		return
-	end
-
-	for i, edge in ipairs(BOX_EDGES) do
-		local line = self:GetDrawing(id .. "_3d_" .. i, "Line")
-		line.Visible   = true
-		line.From      = corners[edge[1]]
-		line.To        = corners[edge[2]]
-		line.Color     = color
-		line.Thickness = self.Settings.ESP.BoxThickness
-
-		if isCorner then
-			local dir = (line.To - line.From)
-			local len = dir.Magnitude
-			if len > 0 then
-				local unit = dir / len
-				line.To = line.From + unit * (len * 0.25)
-
-				local line2 = self:GetDrawing(id .. "_3dc_" .. i, "Line")
-				line2.Visible   = true
-				line2.From      = corners[edge[2]]
-				line2.To        = corners[edge[2]] - unit * (len * 0.25)
-				line2.Color     = color
-				line2.Thickness = self.Settings.ESP.BoxThickness
-			end
+function ESP:resolveEntity(ent)
+	local subject = ent.get()
+	if not subject then return nil end
+	local kind = typeof(subject)
+	if kind == "Vector3" then return subject, nil end
+	if kind == "Instance" then
+		if subject:IsA("BasePart") then return subject.Position, subject.Size end
+		if subject:IsA("Model") then
+			local pivot, size = subject:GetBoundingBox()
+			return pivot.Position, size
 		end
 	end
 end
 
-function EasyESP:RenderSkeleton(id, char, color)
-	local rig = char:FindFirstChild("UpperTorso") and "R15" or "R6"
-	for i, bone in ipairs(BONES[rig]) do
-		local a, b = char:FindFirstChild(bone[1]), char:FindFirstChild(bone[2])
-		local line = self:GetDrawing(id .. "_skel_" .. i, "Line")
-		if a and b then
-			local posA, zA, visA = self:W2S(a.Position)
-			local posB, zB, visB = self:W2S(b.Position)
-			if visA and visB and zA > 0 and zB > 0 then
-				line.Visible   = true
-				line.From      = posA
-				line.To        = posB
-				line.Color     = color
-				line.Thickness = 1
-			else
-				line.Visible = false
+function ESP:drawEntities()
+	local eye = cam.CFrame.Position
+	for id, ent in pairs(self.entities) do
+		local pos, size = self:resolveEntity(ent)
+		if pos then
+			local dist = (eye - pos).Magnitude
+			if dist <= ent.maxRange then
+				local x, y, depth, onScreen = self:project(pos)
+				if onScreen and depth > 0 then
+					local key = "ent" .. id
+					size = size or ent.size
+					local half = size * 0.5
+					local lx, ly, hx, hy = huge, huge, -huge, -huge
+					local ok = true
+					for i = 1, 8 do
+						local px, py, pd = self:project(pos + CORNERS[i] * half)
+						if pd <= 0 then ok = false break end
+						if px < lx then lx = px end
+						if py < ly then ly = py end
+						if px > hx then hx = px end
+						if py > hy then hy = py end
+					end
+					if ok then
+						local bw, bh = hx - lx, hy - ly
+						local mid = lx + bw / 2
+						if ent.box then
+							self.pool:rect(key .. "bo", lx - 1, ly - 1, bw + 2, bh + 2, BLACK, false, 3, 1)
+							self.pool:rect(key .. "b", lx, ly, bw, bh, ent.color, false, 1, 1)
+						end
+						if ent.dot then self.pool:dot(key .. "d", mid, hy, 3, ent.color, true, 1, 12) end
+						local below = hy + 3
+						if ent.name and ent.label then
+							self.pool:text(key .. "n", ent.label, mid, ly - 16, 13, ent.color, true, FONTS.Plex, true)
+						end
+						if ent.distance then
+							self.pool:text(key .. "ds", floor(dist) .. "m", mid, below, 11, ent.color, true, FONTS.Plex, true)
+						end
+						if ent.tracer then
+							local vp = cam.ViewportSize
+							self.pool:line(key .. "tr", vp.X / 2, vp.Y, mid, hy, ent.color, 1, 1)
+						end
+						if ent.ring then
+							self:paintRing(key .. "r", pos.X, pos.Y - (size.Y / 2), pos.Z, ent.ring, 0, self:lodOf(dist))
+						end
+						if ent.draw then ent.draw(self, key, pos, lx, ly, bw, bh, dist) end
+					end
+				end
 			end
-		else
-			line.Visible = false
 		end
 	end
 end
 
-function EasyESP:RenderTracer(id, target, color)
-	local s = self.Settings.ESP
-	local viewport = Camera.ViewportSize
-	local origin = Vector2new(viewport.X / 2, viewport.Y)
-	if s.TracerOrigin == "Center" then
-		origin = Vector2new(viewport.X / 2, viewport.Y / 2)
-	elseif s.TracerOrigin == "Top" then
-		origin = Vector2new(viewport.X / 2, 0)
-	elseif s.TracerOrigin == "Mouse" then
-		origin = UserInputService:GetMouseLocation()
-	end
+local DEPTH = { top = Enum.HighlightDepthMode.AlwaysOnTop, occluded = Enum.HighlightDepthMode.Occluded }
 
-	local line = self:GetDrawing(id .. "_tracer", "Line")
-	line.Visible   = true
-	line.From      = origin
-	line.To        = target
-	line.Color     = color
-	line.Thickness = 1
-end
-
-local HIGHLIGHT_DEPTH = {
-	AlwaysOnTop = Enum.HighlightDepthMode.AlwaysOnTop,
-	Occluded    = Enum.HighlightDepthMode.Occluded,
-}
-
-function EasyESP:RestoreMaterialCham(id)
-	local saved = self.State.MaterialChams[id]
+function ESP:dropMatCham(uid)
+	local saved = self.mat[uid]
 	if not saved then return end
 	for part, orig in pairs(saved) do
 		if part.Parent then
-			part.Material    = orig.Material
-			part.Color       = orig.Color
-			part.Transparency= orig.Transparency
+			part.Material, part.Color, part.Transparency = orig[1], orig[2], orig[3]
 		end
 	end
-	self.State.MaterialChams[id] = nil
+	self.mat[uid] = nil
 end
 
-function EasyESP:RemoveCham(id)
-	local existing = self.State.Highlights[id]
-	if existing then
-		existing:Destroy()
-		self.State.Highlights[id] = nil
-	end
-	self:RestoreMaterialCham(id)
+function ESP:killCham(uid)
+	local h = self.hl[uid]
+	if h then h:Destroy() self.hl[uid] = nil end
+	self:dropMatCham(uid)
 end
 
-function EasyESP:UpdateChams(plr, char, visible)
-	local c  = self.Settings.Chams
-	local id = tostring(plr.UserId)
+function ESP:paintCham(plr, rig, visible)
+	local c = self.cfg.chams
+	local uid = plr.UserId
+	if not c.on or not rig then return self:killCham(uid) end
 
-	if not c.Enabled or not char then
-		self:RemoveCham(id)
-		return
+	local fill, line = c.fillColor, c.outlineColor
+	if c.wallColors then
+		local tint = visible and c.visible or c.hidden
+		fill, line = tint, tint
 	end
 
-	local fillColor, outlineColor = c.FillColor, c.OutlineColor
-	if c.UseVisibleColor then
-		local col = visible and c.VisibleColor or c.HiddenColor
-		fillColor, outlineColor = col, col
-	end
-
-	if c.Mode == "Material" then
-		if self.State.Highlights[id] then
-			self.State.Highlights[id]:Destroy()
-			self.State.Highlights[id] = nil
-		end
-
-		local mat = Enum.Material[c.Material] or Enum.Material.ForceField
-		local matColor = c.UseVisibleColor and fillColor or c.MaterialColor
-		local saved = self.State.MaterialChams[id]
-		if not saved then
-			saved = {}
-			self.State.MaterialChams[id] = saved
-		end
-
-		for _, part in ipairs(char:GetChildren()) do
-			if part:IsA("BasePart") then
-				if part.Name == "Head" and not c.MaterialAffectHead then continue end
-				if not saved[part] then
-					saved[part] = {
-						Material     = part.Material,
-						Color        = part.Color,
-						Transparency = part.Transparency,
-					}
-				end
-				part.Material     = mat
-				part.Color        = matColor
-				part.Transparency = c.MaterialTransparency
+	if c.mode == "material" then
+		local live = self.hl[uid]
+		if live then live:Destroy() self.hl[uid] = nil end
+		local mat = Enum.Material[c.material] or Enum.Material.ForceField
+		local tint = c.wallColors and fill or c.matColor
+		local saved = self.mat[uid] or {}
+		self.mat[uid] = saved
+		for _, part in ipairs(rig:GetChildren()) do
+			if part:IsA("BasePart") and (part.Name ~= "Head" or c.matHead) then
+				if not saved[part] then saved[part] = { part.Material, part.Color, part.Transparency } end
+				part.Material, part.Color, part.Transparency = mat, tint, c.matAlpha
 			end
 		end
 		return
 	end
 
-	self:RestoreMaterialCham(id)
-
-	local hl = self.State.Highlights[id]
-	if not hl or hl.Parent ~= char then
-		if hl then hl:Destroy() end
-		hl = Instance.new("Highlight")
-		hl.Name    = "EasyESP_Cham"
-		hl.Adornee = char
-		hl.Parent  = char
-		self.State.Highlights[id] = hl
+	self:dropMatCham(uid)
+	local h = self.hl[uid]
+	if not h or h.Parent ~= rig then
+		if h then h:Destroy() end
+		h = Instance.new("Highlight")
+		h.Name = "esp_cham"
+		h.Adornee = rig
+		h.Parent = rig
+		self.hl[uid] = h
 	end
-
-	hl.Enabled             = true
-	hl.FillColor           = fillColor
-	hl.FillTransparency    = c.Fill and c.FillTransparency or 1
-	hl.OutlineColor        = outlineColor
-	hl.OutlineTransparency = c.Outline and c.OutlineTransparency or 1
-	hl.DepthMode           = HIGHLIGHT_DEPTH[c.DepthMode] or Enum.HighlightDepthMode.AlwaysOnTop
+	h.Enabled = true
+	h.FillColor = fill
+	h.FillTransparency = c.fill and c.fillAlpha or 1
+	h.OutlineColor = line
+	h.OutlineTransparency = c.outline and c.outlineAlpha or 1
+	h.DepthMode = DEPTH[c.depth] or DEPTH.top
 end
 
-function EasyESP:CaptureWorldOriginal()
-	if self.State.WorldOriginal then return end
-	self.State.WorldOriginal = {
-		Brightness           = Lighting.Brightness,
-		Ambient              = Lighting.Ambient,
-		OutdoorAmbient       = Lighting.OutdoorAmbient,
-		ExposureCompensation = Lighting.ExposureCompensation,
-		FogEnd               = Lighting.FogEnd,
-		FieldOfView          = Camera.FieldOfView,
+function ESP:snapshotWorld()
+	if self.worldSnap then return end
+	self.worldSnap = {
+		Lighting.Brightness, Lighting.Ambient, Lighting.OutdoorAmbient,
+		Lighting.ExposureCompensation, Lighting.FogEnd, cam.FieldOfView,
 	}
 end
 
-function EasyESP:RestoreWorld()
-	local o = self.State.WorldOriginal
-	if not o then return end
-	Lighting.Brightness           = o.Brightness
-	Lighting.Ambient              = o.Ambient
-	Lighting.OutdoorAmbient       = o.OutdoorAmbient
-	Lighting.ExposureCompensation = o.ExposureCompensation
-	Lighting.FogEnd               = o.FogEnd
-	Camera.FieldOfView            = o.FieldOfView
-
-	local cc = Lighting:FindFirstChild("EasyESP_CC")
-	if cc then cc:Destroy() end
-	self.State.WorldApplied = false
+function ESP:restoreWorld()
+	local s = self.worldSnap
+	if not s then return end
+	Lighting.Brightness = s[1]
+	Lighting.Ambient = s[2]
+	Lighting.OutdoorAmbient = s[3]
+	Lighting.ExposureCompensation = s[4]
+	Lighting.FogEnd = s[5]
+	cam.FieldOfView = s[6]
+	local grade = Lighting:FindFirstChild("esp_grade")
+	if grade then grade:Destroy() end
+	self.worldApplied = false
 end
 
-function EasyESP:UpdateWorld()
-	local w = self.Settings.World
-
-	if not w.Enabled then
-
-		if self.State.WorldApplied then
-			self:RestoreWorld()
-		end
+function ESP:driveWorld()
+	local w = self.cfg.world
+	if not w.on then
+		if self.worldApplied then self:restoreWorld() end
 		return
 	end
+	self:snapshotWorld()
+	self.worldApplied = true
+	Lighting.Brightness = w.fullbright and 3 or w.brightness
+	Lighting.Ambient = w.ambient
+	Lighting.OutdoorAmbient = w.outdoor
+	Lighting.ExposureCompensation = w.exposure
+	cam.FieldOfView = w.fov
+	Lighting.FogEnd = w.noFog and 1e7 or self.worldSnap[5]
 
-	self:CaptureWorldOriginal()
-	self.State.WorldApplied = true
-
-	Lighting.Brightness           = w.Fullbright and 3 or w.Brightness
-	Lighting.Ambient              = w.Ambient
-	Lighting.OutdoorAmbient       = w.OutdoorAmbient
-	Lighting.ExposureCompensation = w.Exposure
-	Camera.FieldOfView            = w.FOV
-
-	if w.NoFog then
-		Lighting.FogEnd = 1e7
-	elseif self.State.WorldOriginal then
-		Lighting.FogEnd = self.State.WorldOriginal.FogEnd
+	local grade = Lighting:FindFirstChild("esp_grade")
+	if not grade then
+		grade = Instance.new("ColorCorrectionEffect")
+		grade.Name = "esp_grade"
+		grade.Parent = Lighting
 	end
-
-	local cc = Lighting:FindFirstChild("EasyESP_CC")
-	if not cc then
-		cc = Instance.new("ColorCorrectionEffect")
-		cc.Name   = "EasyESP_CC"
-		cc.Parent = Lighting
-	end
-	cc.Enabled    = w.ColorCorrection
-	cc.Saturation = w.Saturation
-	cc.Contrast   = w.Contrast
+	grade.Enabled = w.colorGrade
+	grade.Saturation = w.saturation
+	grade.Contrast = w.contrast
 end
 
-function EasyESP:AddFlag(name, provider)
-	self.State.FlagProviders[name] = provider
-end
+function ESP:addFlag(name, fn) self.flagProviders[name] = fn end
+function ESP:removeFlag(name) self.flagProviders[name] = nil end
 
-function EasyESP:RemoveFlag(name)
-	self.State.FlagProviders[name] = nil
-end
+function ESP:installFlags()
+	local white  = rgb(220, 220, 230)
+	local green  = rgb(90, 235, 130)
+	local red    = rgb(235, 80, 80)
+	local blue   = rgb(120, 170, 255)
+	local gold   = rgb(255, 210, 90)
 
-function EasyESP:RegisterDefaultFlags()
-	local white  = Color3fromRGB(220, 220, 230)
-	local yellow = Color3fromRGB(255, 210, 90)
-	local green  = Color3fromRGB(90, 230, 130)
-	local red    = Color3fromRGB(255, 80, 80)
-	local blue   = Color3fromRGB(120, 170, 255)
-
-	self:AddFlag("Visible", function(ctx)
-		if ctx.visible == nil then return nil end
-		if ctx.visible then return { text = "V", color = green } end
-		return { text = "HID", color = red }
+	self:addFlag("visible", function(t)
+		if t.visible == nil then return end
+		return t.visible and { "V", green } or { "HID", red }
 	end)
-
-	self:AddFlag("Flying", function(ctx)
-		local hum = ctx.humanoid
-		if hum and (hum:GetState() == Enum.HumanoidStateType.Freefall
-			or hum:GetState() == Enum.HumanoidStateType.Flying) then
-			return { text = "FLY", color = blue }
+	self:addFlag("flying", function(t)
+		local h = t.hum
+		if h and (h:GetState() == Enum.HumanoidStateType.Freefall or h:GetState() == Enum.HumanoidStateType.Flying) then
+			return { "FLY", blue }
 		end
-		return nil
 	end)
-
-	self:AddFlag("Health", function(ctx)
-		if not ctx.humanoid then return nil end
-		return { text = mathfloor(ctx.humanoid.Health) .. "hp", color = green }
+	self:addFlag("hp", function(t) return t.hum and { floor(t.hum.Health) .. "hp", green } or nil end)
+	self:addFlag("distance", function(t) return { floor(t.dist) .. "m", white } end)
+	self:addFlag("gun", function(t)
+		local g = self.gunOf(t.plr)
+		return g and { g, gold } or nil
 	end)
-
-	self:AddFlag("Distance", function(ctx)
-		return { text = mathfloor(ctx.distance) .. "m", color = white }
+	self:addFlag("speed", function(t)
+		if not t.root then return end
+		local v = floor(t.root.AssemblyLinearVelocity.Magnitude + 0.5)
+		return v > 2 and { v .. " sps", rgb(120, 220, 255) } or nil
 	end)
-
-	self:AddFlag("Weapon", function(ctx)
-		local t = self.GetTool(ctx.player)
-		if t and t ~= "None" then return { text = t, color = yellow } end
-		return nil
-	end)
-
-	self:AddFlag("Money", function(ctx)
-		local v = ctx.player:GetAttribute("Money") or ctx.player:GetAttribute("Cash")
-		if v then return { text = "$" .. tostring(v), color = green } end
-		return nil
-	end)
-
-	self:AddFlag("Level", function(ctx)
-		local v = ctx.player:GetAttribute("Level")
-		if v then return { text = "Lvl " .. tostring(v), color = blue } end
-		return nil
-	end)
-
-	self:AddFlag("Speed", function(ctx)
-		if not ctx.root then return nil end
-		local spd = mathfloor(ctx.root.AssemblyLinearVelocity.Magnitude + 0.5)
-		if spd > 2 then return { text = spd .. " sps", color = Color3fromRGB(120, 220, 255) } end
-		return nil
-	end)
-
-	self:AddFlag("Airborne", function(ctx)
-		if not ctx.root then return nil end
-		if ctx.root.AssemblyLinearVelocity.Y > 3 then
-			return { text = "JUMP", color = Color3fromRGB(255, 230, 120) }
-		end
-		return nil
-	end)
-
-	self:AddFlag("Sprinting", function(ctx)
-		local hum = ctx.humanoid
-		if hum and hum.WalkSpeed > 18 then
-			return { text = "SPRINT", color = Color3fromRGB(255, 170, 60) }
-		end
-		return nil
-	end)
-
-	self:AddFlag("Crouch", function(ctx)
-		local hum = ctx.humanoid
-		if hum and hum:GetState() == Enum.HumanoidStateType.PlatformStanding then
-			return { text = "CROUCH", color = Color3fromRGB(180, 180, 200) }
-		end
-		return nil
-	end)
-
-	self:AddFlag("Frozen", function(ctx)
-		local hum = ctx.humanoid
-		if hum and hum.WalkSpeed == 0 and hum.Health > 0 then
-			return { text = "FROZEN", color = Color3fromRGB(140, 210, 255) }
-		end
-		return nil
-	end)
-
-	self:AddFlag("God", function(ctx)
-		local hum = ctx.humanoid
-		if hum and hum.MaxHealth >= 1e6 then
-			return { text = "GOD", color = Color3fromRGB(255, 215, 0) }
-		end
-		return nil
-	end)
-
-	self:AddFlag("Bacon", function(ctx)
-		local char = ctx.character
-		if char and char:FindFirstChild("Pal Hair") then
-			return { text = "BACON", color = Color3fromRGB(230, 160, 90) }
-		end
-		return nil
-	end)
-
-	self:AddFlag("Armor", function(ctx)
-		local v = ctx.player:GetAttribute("Armor") or ctx.player:GetAttribute("Shield")
-		if v and v > 0 then return { text = mathfloor(v) .. "ar", color = Color3fromRGB(120, 180, 255) } end
-		return nil
-	end)
+	self:addFlag("sprint", function(t) return (t.hum and t.hum.WalkSpeed > 18) and { "SPRINT", rgb(255, 170, 60) } or nil end)
+	self:addFlag("frozen", function(t) return (t.hum and t.hum.WalkSpeed == 0 and t.hum.Health > 0) and { "FROZEN", rgb(140, 210, 255) } or nil end)
+	self:addFlag("god", function(t) return (t.hum and t.hum.MaxHealth >= 1e6) and { "GOD", gold } or nil end)
 end
 
-function EasyESP:CircleWorldPoints(center, radius, segments, spin)
-	local pts = {}
-	spin = spin or 0
-	for i = 0, segments - 1 do
-		local a = (i / segments) * TAU + spin
-		pts[i + 1] = center + Vector3new(mathcos(a) * radius, 0, mathsin(a) * radius)
-	end
-	return pts
-end
-
-function EasyESP:DrawWorldRing(id, center, radius, segments, color, thickness, alpha, spin, opts)
-	opts = opts or EMPTY
-	segments = mathclamp(mathfloor(segments), 6, 128)
-	spin = spin or 0
-
-	local scr = self._ringBuf
-	local n = 0
-	for i = 0, segments - 1 do
-		local a = (i / segments) * TAU + spin
-		local wp = center + Vector3new(mathcos(a) * radius, 0, mathsin(a) * radius)
-		local sp, depth = self:W2S(wp)
-		n = n + 1
-		local slot = scr[n]
-		if slot then
-			slot.x, slot.y, slot.d = sp.X, sp.Y, depth
-		else
-			scr[n] = { x = sp.X, y = sp.Y, d = depth }
-		end
-	end
-
-	local dashed   = opts.dashed
-	local dashGap  = opts.dashGap or 2
-	local gradient = opts.gradient
-	local gradTo   = opts.gradientColor
-	local glow     = opts.glow
-	local glowAlpha= opts.glowAlpha or (alpha * 0.35)
-
-	for i = 1, segments do
-		local a = scr[i]
-		local b = scr[(i % segments) + 1]
-		local line = self:GetDrawing(id .. "_r_" .. i, "Line")
-		local show = a.d > 0 and b.d > 0 and (not dashed or ((i % dashGap) == 0))
-		if show then
-			local segColor = color
-			if gradient and gradTo then
-				segColor = color:Lerp(gradTo, i / segments)
-			end
-			line.Visible      = true
-			line.From         = Vector2new(a.x, a.y)
-			line.To           = Vector2new(b.x, b.y)
-			line.Color        = segColor
-			line.Thickness    = thickness
-			line.Transparency = alpha
-		else
-			line.Visible = false
-		end
-
-		if glow then
-			local g = self:GetDrawing(id .. "_rg_" .. i, "Line")
-			if show then
-				g.Visible = true
-				g.From = line.From
-				g.To = line.To
-				g.Color = color
-				g.Thickness = thickness + 3
-				g.Transparency = glowAlpha
-			else
-				g.Visible = false
-			end
-		end
-	end
-
-	if opts.filled then
-		local cs, cd = self:W2S(center)
-		local fillAlpha = opts.fillAlpha or 0.08
-		for i = 1, segments do
-			local a = scr[i]
-			local b = scr[(i % segments) + 1]
-			local tri = self:GetDrawing(id .. "_rf_" .. i, "Triangle")
-			if cd > 0 and a.d > 0 and b.d > 0 then
-				tri.Visible = true
-				tri.PointA  = cs
-				tri.PointB  = Vector2new(a.x, a.y)
-				tri.PointC  = Vector2new(b.x, b.y)
-				tri.Color   = color
-				tri.Filled  = true
-				tri.Transparency = fillAlpha
-			else
-				tri.Visible = false
-			end
-		end
-	end
-end
-
-function EasyESP:DrawWorldSphere(id, center, radius, ringCount, segments, color, thickness, alpha, spin, opts)
-	opts = opts or EMPTY
-	segments = mathclamp(mathfloor(segments), 6, 64)
-	ringCount = mathclamp(mathfloor(ringCount), 2, 16)
-	local lineIdx = 0
-
-	local function link(pA, pB)
-		if pA and pA.d > 0 and pB.d > 0 then
-			lineIdx = lineIdx + 1
-			local line = self:GetDrawing(id .. "_sp_" .. lineIdx, "Line")
-			line.Visible = true
-			line.From = Vector2new(pA.x, pA.y)
-			line.To = Vector2new(pB.x, pB.y)
-			line.Color = color
-			line.Thickness = thickness
-			line.Transparency = alpha
-		end
-	end
-
-	for r = 1, ringCount do
-		local frac = r / (ringCount + 1)
-		local y = (frac - 0.5) * 2 * radius
-		local rr = math.sqrt(mathmax(radius * radius - y * y, 0))
-		local prev
-		for i = 0, segments do
-			local a = (i / segments) * TAU + spin
-			local sp, depth = self:W2S(center + Vector3new(mathcos(a) * rr, y, mathsin(a) * rr))
-			local cur = { x = sp.X, y = sp.Y, d = depth }
-			if prev then link(prev, cur) end
-			prev = cur
-		end
-	end
-
-	local meridians = mathmax(4, mathfloor(segments / 4))
-	for m = 0, meridians - 1 do
-		local ang = (m / meridians) * math.pi + spin
-		local prev
-		for i = 0, segments do
-			local t = (i / segments) * TAU
-			local sp, depth = self:W2S(center + Vector3new(mathcos(t) * radius * mathcos(ang), mathsin(t) * radius, mathcos(t) * radius * mathsin(ang)))
-			local cur = { x = sp.X, y = sp.Y, d = depth }
-			if prev then link(prev, cur) end
-			prev = cur
-		end
-	end
-end
-
-function EasyESP:DrawWorldArc(id, center, radius, segments, startA, sweep, color, thickness, alpha)
-	segments = mathclamp(mathfloor(segments), 2, 64)
-	local prev
-	for i = 0, segments do
-		local a = startA + (i / segments) * sweep
-		local sp, depth = self:W2S(center + Vector3new(mathcos(a) * radius, 0, mathsin(a) * radius))
-		local cur = { x = sp.X, y = sp.Y, d = depth }
-		if prev and prev.d > 0 and cur.d > 0 then
-			local line = self:GetDrawing(id .. "_arc_" .. i, "Line")
-			line.Visible = true
-			line.From = Vector2new(prev.x, prev.y)
-			line.To = Vector2new(cur.x, cur.y)
-			line.Color = color
-			line.Thickness = thickness
-			line.Transparency = alpha
-		end
-		prev = cur
-	end
-end
-
-function EasyESP:DrawWorldDot(id, worldPos, size, color, alpha)
-	local sp, depth = self:W2S(worldPos)
-	local dot = self:GetDrawing(id, "Circle")
-	if depth > 0 then
-		dot.Visible = true
-		dot.Position = sp
-		dot.Radius = size
-		dot.Filled = true
-		dot.Color = color
-		dot.Transparency = alpha or 1
-		dot.NumSides = 12
-	else
-		dot.Visible = false
-	end
-	return depth > 0
-end
-
-
-function EasyESP:DrawWorldPolygon(id, center, radius, sides, color, thickness, alpha, spin)
-	sides = mathclamp(mathfloor(sides), 3, 16)
-	spin = spin or 0
-	local prev, first
-	for i = 0, sides do
-		local a = (i / sides) * TAU + spin
-		local sp, depth = self:W2S(center + Vector3new(mathcos(a) * radius, 0, mathsin(a) * radius))
-		local cur = { x = sp.X, y = sp.Y, d = depth }
-		if i == 0 then first = cur end
-		if prev and prev.d > 0 and cur.d > 0 then
-			local line = self:GetDrawing(id .. "_poly_" .. i, "Line")
-			line.Visible = true
-			line.From = Vector2new(prev.x, prev.y)
-			line.To = Vector2new(cur.x, cur.y)
-			line.Color = color
-			line.Thickness = thickness
-			line.Transparency = alpha
-		end
-		prev = cur
-	end
-end
-
-function EasyESP:DrawWorldStar(id, center, outerR, innerR, points, color, thickness, alpha, spin)
-	points = mathclamp(mathfloor(points), 3, 12)
-	spin = spin or 0
-	local verts = {}
-	local total = points * 2
-	for i = 0, total - 1 do
-		local a = (i / total) * TAU + spin
-		local r = (i % 2 == 0) and outerR or innerR
-		local sp, depth = self:W2S(center + Vector3new(mathcos(a) * r, 0, mathsin(a) * r))
-		verts[i + 1] = { x = sp.X, y = sp.Y, d = depth }
-	end
-	for i = 1, total do
-		local a = verts[i]
-		local b = verts[(i % total) + 1]
-		local line = self:GetDrawing(id .. "_star_" .. i, "Line")
-		if a.d > 0 and b.d > 0 then
-			line.Visible = true
-			line.From = Vector2new(a.x, a.y)
-			line.To = Vector2new(b.x, b.y)
-			line.Color = color
-			line.Thickness = thickness
-			line.Transparency = alpha
-		else
-			line.Visible = false
-		end
-	end
-end
-
-function EasyESP:DrawRadarSweep(id, center, radius, sweepAngle, arcLen, segments, color, thickness, alpha)
-	segments = mathclamp(mathfloor(segments), 2, 32)
-	local prev
-	for i = 0, segments do
-		local a = sweepAngle - arcLen + (i / segments) * arcLen
-		local sp, depth = self:W2S(center + Vector3new(mathcos(a) * radius, 0, mathsin(a) * radius))
-		local cur = { x = sp.X, y = sp.Y, d = depth }
-		if prev and prev.d > 0 and cur.d > 0 then
-			local line = self:GetDrawing(id .. "_sweep_" .. i, "Line")
-			line.Visible = true
-			line.From = Vector2new(prev.x, prev.y)
-			line.To = Vector2new(cur.x, cur.y)
-			line.Color = color
-			line.Thickness = thickness
-			line.Transparency = alpha * (i / segments)
-		end
-		prev = cur
-	end
-	local cs, cd = self:W2S(center)
-	local ep, ed = self:W2S(center + Vector3new(mathcos(sweepAngle) * radius, 0, mathsin(sweepAngle) * radius))
-	local hand = self:GetDrawing(id .. "_sweephand", "Line")
-	if cd > 0 and ed > 0 then
-		hand.Visible = true
-		hand.From = cs
-		hand.To = ep
-		hand.Color = color
-		hand.Thickness = thickness
-		hand.Transparency = alpha
-	else
-		hand.Visible = false
-	end
-end
-
-function EasyESP:VisualsBox(id, bx, by, bw, bh, cfg, color)
-	local style = cfg.Style
-	local th    = cfg.Thickness
-	local out   = cfg.OutlineColor
-
-	if cfg.Fill then
-		self:DrawSquare(id .. "_sfill", Vector2new(bx, by), Vector2new(bw, bh), cfg.FillColor, true, 1, cfg.FillAlpha)
-	end
-
-	if style == "Corner" then
-		local len = mathmin(bw, bh) * cfg.CornerScale
-		local segs = {
-			{Vector2new(bx, by), Vector2new(bx + len, by)}, {Vector2new(bx, by), Vector2new(bx, by + len)},
-			{Vector2new(bx + bw, by), Vector2new(bx + bw - len, by)}, {Vector2new(bx + bw, by), Vector2new(bx + bw, by + len)},
-			{Vector2new(bx, by + bh), Vector2new(bx + len, by + bh)}, {Vector2new(bx, by + bh), Vector2new(bx, by + bh - len)},
-			{Vector2new(bx + bw, by + bh), Vector2new(bx + bw - len, by + bh)}, {Vector2new(bx + bw, by + bh), Vector2new(bx + bw, by + bh - len)},
-		}
-		if cfg.Outline then
-			for i, sgm in ipairs(segs) do
-				self:DrawLine(id .. "_sco_" .. i, sgm[1], sgm[2], out, th + 2, 1)
-			end
-		end
-		for i, sgm in ipairs(segs) do
-			self:DrawLine(id .. "_sc_" .. i, sgm[1], sgm[2], color, th, 1)
-		end
-	else
-		if cfg.Outline then
-			self:DrawSquare(id .. "_sbo", Vector2new(bx - 1, by - 1), Vector2new(bw + 2, bh + 2), out, false, th + 2, 1)
-			self:DrawSquare(id .. "_sbo2", Vector2new(bx + 1, by + 1), Vector2new(bw - 2, bh - 2), out, false, 1, 1)
-		end
-		self:DrawSquare(id .. "_sb", Vector2new(bx, by), Vector2new(bw, bh), color, false, th, 1)
-	end
-end
-
-function EasyESP:VisualsGlow(id, bx, by, bw, bh, cfg, color, clock)
-	local layers = cfg.Layers
-	local pulse = cfg.Pulse and (0.5 + 0.5 * mathsin(clock * cfg.PulseSpeed)) or 1
-	for i = 1, layers do
-		local g = i * cfg.Spread
-		local alpha = cfg.Alpha * pulse * (1 - (i - 1) / layers)
-		self:DrawSquare(id .. "_glow_" .. i, Vector2new(bx - g, by - g), Vector2new(bw + g * 2, bh + g * 2), color, false, 1, alpha)
-	end
-end
-
-function EasyESP:VisualsHealthBar(id, bx, by, bw, bh, pct, cfg)
-	local th = cfg.Thickness
-	local left = cfg.Side ~= "Right"
-	local xPos = left and (bx - 4 - th) or (bx + bw + 4)
-	pct = mathclamp(pct, 0, 1)
-
-	if cfg.Outline then
-		self:DrawSquare(id .. "_hbo", Vector2new(xPos - 1, by - 1), Vector2new(th + 2, bh + 2), Color3new(0, 0, 0), true, 1, 0.7)
-	end
-	self:DrawSquare(id .. "_hbg", Vector2new(xPos, by), Vector2new(th, bh), Color3new(0.1, 0.1, 0.12), true, 1, 0.6)
-
-	local col = cfg.ColorFull
-	if cfg.Gradient then
-		col = cfg.ColorLow:Lerp(cfg.ColorFull, pct)
-	elseif pct < 0.3 then
-		col = cfg.ColorLow
-	end
-	local fillH = bh * pct
-	self:DrawSquare(id .. "_hbf", Vector2new(xPos, by + (bh - fillH)), Vector2new(th, mathmax(fillH, 1)), col, true, 1, 1)
-
-	if cfg.Notch then
-		self:DrawLine(id .. "_hbn", Vector2new(xPos, by + bh * 0.5), Vector2new(xPos + th, by + bh * 0.5), Color3new(0, 0, 0), 1, 0.5)
-	end
-	if cfg.ShowText and pct < 1 then
-		self:DrawText(id .. "_hbt", tostring(mathfloor(pct * 100)), Vector2new(xPos + th / 2, by - 12), 10, Color3new(1, 1, 1), true, 2, true)
-	end
-end
-
-function EasyESP:VisualsArmorBar(id, bx, by, bw, bh, pct, cfg)
-	local th = cfg.Thickness
-	pct = mathclamp(pct, 0, 1)
-	local yPos = by + bh + 3
-	if cfg.Outline then
-		self:DrawSquare(id .. "_abo", Vector2new(bx - 1, yPos - 1), Vector2new(bw + 2, th + 2), Color3new(0, 0, 0), true, 1, 0.7)
-	end
-	self:DrawSquare(id .. "_abg", Vector2new(bx, yPos), Vector2new(bw, th), Color3new(0.1, 0.1, 0.12), true, 1, 0.6)
-	self:DrawSquare(id .. "_abf", Vector2new(bx, yPos), Vector2new(bw * pct, th), cfg.Color, true, 1, 1)
-end
-
-function EasyESP:VisualsFlags(id, bx, by, bw, bh, ctx, cfg)
-	local right = cfg.Side ~= "Left"
-	local xPos = right and (bx + bw + 5) or (bx - 5)
-	local yPos = by
+function ESP:drawFlags(key, lx, ly, bw, ctx)
+	local f = self.cfg.flags
+	local right = f.side ~= "left"
+	local col = right and lx + bw + 5 or lx - 5
+	local row = ly
 	local i = 0
-	for _, provider in pairs(self.State.FlagProviders) do
-		local ok, res = pcall(provider, ctx)
-		if ok and res and res.text then
+	for _, provider in pairs(self.flagProviders) do
+		local ok, out = pcall(provider, ctx)
+		if ok and out then
 			i = i + 1
-			local t = self:GetDrawing(id .. "_flag_" .. i, "Text")
-			t.Visible      = true
-			t.Text         = res.text
-			t.Size         = cfg.Size
-			t.Color        = res.color or cfg.DefaultColor
-			t.Font         = cfg.Font
-			t.Outline      = cfg.Outline
-			t.OutlineColor = Color3new(0, 0, 0)
-			t.Center       = false
-			if right then
-				t.Position = Vector2new(xPos, yPos)
-			else
-				t.Position = Vector2new(xPos - t.TextBounds.X, yPos)
-			end
-			yPos = yPos + cfg.Size + cfg.Spacing
+			local d = self.pool:grab(key .. "fl" .. i, "Text")
+			sp(d, "Visible", true)
+			sp(d, "Text", out[1])
+			sp(d, "Size", f.size)
+			sp(d, "Color", out[2] or f.color)
+			sp(d, "Font", f.font)
+			sp(d, "Outline", true)
+			sp(d, "OutlineColor", BLACK)
+			sp(d, "Center", false)
+			sp(d, "Position", right and v2(col, row) or v2(col - d.TextBounds.X, row))
+			row = row + f.size + f.spacing
 		end
 	end
-	for j = i + 1, (self._maxFlags or 0) do
-		local d = self.State.Drawings[id .. "_flag_" .. j]
-		if d then d.Visible = false end
-	end
-	self._maxFlags = mathmax(self._maxFlags or 0, i)
 end
 
-function EasyESP:TriggerHitMarker(userId, damage)
-	self.State.HitMarkers[tostring(userId)] = { t = self.State.Clock, dmg = damage }
-end
-
-function EasyESP:UpdateHitTracking(plr, hum)
-	local id = tostring(plr.UserId)
-	local last = self.State.LastHealth[id]
-	if last ~= nil and hum.Health < last then
-		self:TriggerHitMarker(plr.UserId, mathfloor(last - hum.Health))
-	end
-	self.State.LastHealth[id] = hum.Health
-end
-
-function EasyESP:RecordBacktrack(plr, char)
-	local cfg = self.Settings.Visuals.Backtrack
-	if not cfg.Enabled then return end
-	local id = tostring(plr.UserId)
-	local hist = self.State.Backtrack[id]
-	if not hist then hist = {}; self.State.Backtrack[id] = hist end
-	local now = self.State.Clock
-	local lastTick = hist[#hist]
-	if lastTick and (now - lastTick.t) < cfg.Interval then return end
-
-	local rig = char:FindFirstChild("UpperTorso") and "R15" or "R6"
-	local snapshot = { t = now, rig = rig, joints = {} }
-	local seen = {}
-	for _, bone in ipairs(BONES[rig]) do
-		for _, part in ipairs(bone) do
-			if not seen[part] then
-				local p = char:FindFirstChild(part)
-				if p then snapshot.joints[part] = p.Position end
-				seen[part] = true
+function ESP:drawBones(key, rig, color, thick)
+	local set = rig:FindFirstChild("UpperTorso") and RIG15 or RIG6
+	for i, bone in ipairs(set) do
+		local a = rig:FindFirstChild(bone[1])
+		local b = rig:FindFirstChild(bone[2])
+		if a and b then
+			local ax, ay, ad = self:project(a.Position)
+			local bx, by, bd = self:project(b.Position)
+			if ad > 0 and bd > 0 then
+				self.pool:line(key .. "s" .. i, ax, ay, bx, by, color, thick or 1)
 			end
 		end
 	end
-	hist[#hist + 1] = snapshot
-	while #hist > cfg.Ticks do tableremove(hist, 1) end
 end
 
-function EasyESP:RenderBacktrack(id, plr)
-	local cfg = self.Settings.Visuals.Backtrack
-	local hist = self.State.Backtrack[tostring(plr.UserId)]
+function ESP:drawTrailGhost(key, plr)
+	local t = self.cfg.trail
+	local hist = self.btrk[plr.UserId]
 	if not hist then return end
-	local n = #hist
-	local lineIdx = 0
-	for h = 1, n do
+	local total = #hist
+	local n = 0
+	for h = 1, total do
 		local snap = hist[h]
-		local fade = cfg.FadeTail and (h / n) or 1
-		local alpha = cfg.Alpha * fade
-		if cfg.Skeleton then
-			for _, bone in ipairs(BONES[snap.rig]) do
-				local a = snap.joints[bone[1]]
-				local b = snap.joints[bone[2]]
-				if a and b then
-					local pa, za = self:W2S(a)
-					local pb, zb = self:W2S(b)
-					lineIdx = lineIdx + 1
-					local line = self:GetDrawing(id .. "_bt_" .. lineIdx, "Line")
-					if za > 0 and zb > 0 then
-						line.Visible = true
-						line.From = pa
-						line.To = pb
-						line.Color = cfg.Color
-						line.Thickness = 1
-						line.Transparency = alpha
-					else
-						line.Visible = false
-					end
+		local a = t.fade and (h / total) or 1
+		for _, bone in ipairs(snap.set) do
+			local pa, pb = snap.joints[bone[1]], snap.joints[bone[2]]
+			if pa and pb then
+				local ax, ay, ad = self:project(pa)
+				local bx, by, bd = self:project(pb)
+				n = n + 1
+				if ad > 0 and bd > 0 then
+					self.pool:line(key .. "gh" .. n, ax, ay, bx, by, t.color, 1, t.alpha * a)
 				end
 			end
 		end
 	end
-	self._maxBT = mathmax(self._maxBT or 0, lineIdx)
-	for j = lineIdx + 1, (self._maxBT or 0) do
-		local d = self.State.Drawings[id .. "_bt_" .. j]
-		if d then d.Visible = false end
-	end
 end
 
-function EasyESP:GetFootPos(root, hum)
-	local drop = 2.5
-	if hum and hum.HipHeight and hum.HipHeight > 0 then
-		drop = hum.HipHeight + 2.6
+function ESP:draw3DBox(key, rig, color, cornered, thick)
+	local pivot, size = rig:GetBoundingBox()
+	local half = size * 0.5
+	local pts = {}
+	for i = 1, 8 do
+		local x, y, d = self:project((pivot * cnew(CORNERS[i] * half)).Position)
+		if d <= 0 then return end
+		pts[i] = { x, y }
 	end
-	return root.Position - Vector3new(0, drop, 0)
-end
-
-function EasyESP:ResolveRingColor(ring, clock, i)
-	if ring.Effect == "Rainbow" then
-		return Color3fromHSV((clock * 0.15 + (i or 0) * 0.08) % 1, 1, 1)
-	elseif ring.Effect == "Breathe" then
-		return ring.Color:Lerp(ring.Color2 or Color3new(1, 1, 1), 0.5 + 0.5 * mathsin(clock * 2))
-	end
-	return ring.Color
-end
-
-function EasyESP:DrawRingSpec(id, center, ring, clock, i)
-	local spin  = clock * (ring.Spin or 0)
-	local alpha = ring.Alpha or 1
-	if ring.Pulse then alpha = alpha * (0.55 + 0.45 * mathsin(clock * (ring.PulseSpeed or 3))) end
-	local color = self:ResolveRingColor(ring, clock, i)
-	local segs  = ring.Segments or 48
-	local shape = ring.Shape or "Circle"
-
-	if shape == "Square" then
-		self:DrawWorldPolygon(id, center, ring.Radius, 4, color, ring.Thickness or 2, alpha, spin + 0.785)
-		return
-	elseif shape == "Pentagon" then
-		self:DrawWorldPolygon(id, center, ring.Radius, 5, color, ring.Thickness or 2, alpha, spin)
-		return
-	elseif shape == "Hexagon" then
-		self:DrawWorldPolygon(id, center, ring.Radius, 6, color, ring.Thickness or 2, alpha, spin)
-		return
-	elseif shape == "Star" then
-		self:DrawWorldStar(id, center, ring.Radius, ring.Radius * 0.5, ring.StarPoints or 5, color, ring.Thickness or 2, alpha, spin)
-		return
-	elseif shape == "Radar" then
-		self:DrawWorldRing(id .. "_rb", center, ring.Radius, segs, color, 1, alpha * 0.4, 0, EMPTY)
-		self:DrawRadarSweep(id .. "_rs", center, ring.Radius, clock * (ring.Spin ~= 0 and ring.Spin or 2), ring.ArcLen or 1.2, 20, color, ring.Thickness or 2, alpha)
-		return
-	end
-
-	self:DrawWorldRing(id, center, ring.Radius, segs, color, ring.Thickness or 2, alpha, spin, {
-		dashed        = ring.Style == "Dashed",
-		dashGap       = ring.DashGap or 2,
-		gradient      = ring.Gradient,
-		gradientColor = ring.GradientColor,
-		glow          = ring.Glow,
-		glowAlpha     = ring.GlowAlpha,
-		filled        = ring.Filled,
-		fillAlpha     = ring.FillAlpha,
-	})
-
-	if ring.Ticks and ring.Ticks > 0 then
-		for t = 0, ring.Ticks - 1 do
-			local a = (t / ring.Ticks) * TAU + spin
-			local inner = center + Vector3new(mathcos(a) * ring.Radius, 0, mathsin(a) * ring.Radius)
-			local outer = center + Vector3new(mathcos(a) * (ring.Radius + (ring.TickLen or 0.6)), (ring.TickUp or 0.4), mathsin(a) * (ring.Radius + (ring.TickLen or 0.6)))
-			local p1, d1 = self:W2S(inner)
-			local p2, d2 = self:W2S(outer)
-			local line = self:GetDrawing(id .. "_tick_" .. t, "Line")
-			if d1 > 0 and d2 > 0 then
-				line.Visible = true
-				line.From = p1
-				line.To = p2
-				line.Color = color
-				line.Thickness = ring.Thickness or 2
-				line.Transparency = alpha
-			else
-				line.Visible = false
+	for i, edge in ipairs(EDGES) do
+		local a, b = pts[edge[1]], pts[edge[2]]
+		if cornered then
+			local dx, dy = b[1] - a[1], b[2] - a[2]
+			local len = sqrt(dx * dx + dy * dy)
+			if len > 0 then
+				local ux, uy, q = dx / len, dy / len, len * 0.25
+				self.pool:line(key .. "e" .. i, a[1], a[2], a[1] + ux * q, a[2] + uy * q, color, thick)
+				self.pool:line(key .. "f" .. i, b[1], b[2], b[1] - ux * q, b[2] - uy * q, color, thick)
 			end
-		end
-	end
-end
-
-function EasyESP:AddRangeRing(id, opts)
-	opts = opts or {}
-	self.State.RangeRings[id] = {
-		Target    = opts.Target,
-		Radius    = opts.Radius or 10,
-		Color     = opts.Color or Color3fromRGB(200, 60, 220),
-		Color2    = opts.Color2,
-		GradientColor = opts.GradientColor,
-		Thickness = opts.Thickness or 2,
-		Alpha     = opts.Alpha or 1,
-		Segments  = opts.Segments or 48,
-		Style     = opts.Style or "Solid",
-		DashGap   = opts.DashGap or 2,
-		Effect    = opts.Effect or "None",
-		Spin      = opts.Spin or 0,
-		Pulse     = opts.Pulse or false,
-		PulseSpeed= opts.PulseSpeed or 3,
-		Filled    = opts.Filled or false,
-		FillAlpha = opts.FillAlpha or 0.08,
-		Glow      = opts.Glow or false,
-		GlowAlpha = opts.GlowAlpha,
-		Gradient  = opts.Gradient or false,
-		Ticks     = opts.Ticks or 0,
-		TickLen   = opts.TickLen or 0.6,
-		TickUp    = opts.TickUp or 0.4,
-		HeightOffset = opts.HeightOffset or 0.05,
-		Shape     = opts.Shape or "Circle",
-		StarPoints= opts.StarPoints or 5,
-		ArcLen    = opts.ArcLen or 1.2,
-	}
-	return self.State.RangeRings[id]
-end
-
-function EasyESP:RemoveRangeRing(id)
-	self.State.RangeRings[id] = nil
-end
-
-function EasyESP:ClearRangeRings()
-	for k in pairs(self.State.RangeRings) do self.State.RangeRings[k] = nil end
-end
-
-function EasyESP:ResolveRingCenter(target)
-	if target == nil then
-		local char = LocalPlayer.Character
-		local root = char and char:FindFirstChild("HumanoidRootPart")
-		local hum = char and char:FindFirstChildOfClass("Humanoid")
-		if root then return self:GetFootPos(root, hum) end
-		return nil
-	elseif typeof(target) == "Vector3" then
-		return target
-	elseif typeof(target) == "Instance" then
-		if target:IsA("Player") then
-			local char = target.Character
-			local root = char and char:FindFirstChild("HumanoidRootPart")
-			local hum = char and char:FindFirstChildOfClass("Humanoid")
-			if root then return self:GetFootPos(root, hum) end
-			return nil
-		elseif target:IsA("BasePart") then
-			return target.Position - Vector3new(0, target.Size.Y / 2, 0)
-		elseif target:IsA("Model") then
-			local pp = target.PrimaryPart or target:FindFirstChildWhichIsA("BasePart")
-			if pp then return pp.Position end
-		end
-	elseif type(target) == "function" then
-		return target()
-	end
-	return nil
-end
-
-function EasyESP:RenderRangeRings(dt)
-	local clock = self.State.Clock
-	local i = 0
-	for id, ring in pairs(self.State.RangeRings) do
-		i = i + 1
-		local center = self:ResolveRingCenter(ring.Target)
-		if center then
-			self:DrawRingSpec("rr_" .. id, center + Vector3new(0, ring.HeightOffset or 0.05, 0), ring, clock, i)
-		end
-	end
-end
-
-EasyESP.RingPresets = {
-	KillAura = { Radius = 14, Color = Color3fromRGB(255, 70, 70),  Thickness = 2, Style = "Solid",  Spin = 0.4, Glow = true, Ticks = 12, TickLen = 0.8 },
-	Reach    = { Radius = 6,  Color = Color3fromRGB(90, 200, 255), Thickness = 2, Style = "Dashed", Pulse = true },
-	Grab     = { Radius = 4,  Color = Color3fromRGB(90, 255, 150), Thickness = 2, Style = "Solid",  Filled = true, FillAlpha = 0.1 },
-	Rainbow  = { Radius = 12, Color = Color3fromRGB(255, 255, 255), Thickness = 3, Effect = "Rainbow", Spin = 1, Glow = true },
-	Neon     = { Radius = 10, Color = Color3fromRGB(200, 60, 220), Thickness = 2, Glow = true, GlowAlpha = 0.5, Pulse = true },
-	Target   = { Radius = 8,  Color = Color3fromRGB(255, 160, 40), Thickness = 2, Ticks = 24, TickLen = 1.0, Spin = 0.2 },
-}
-
-function EasyESP:ApplyRingPreset(id, presetName, overrides)
-	local preset = EasyESP.RingPresets[presetName]
-	if not preset then return nil end
-	local opts = {}
-	for k, v in pairs(preset) do opts[k] = v end
-	if overrides then
-		for k, v in pairs(overrides) do opts[k] = v end
-	end
-	return self:AddRangeRing(id, opts)
-end
-
-function EasyESP:RecordLocalTrail()
-	local cfg = self.Settings.Visuals.Trail
-	if not cfg or not cfg.Enabled then return end
-	local char = LocalPlayer.Character
-	local root = char and char:FindFirstChild("HumanoidRootPart")
-	if not root then return end
-	local hist = self.State.LocalTrail
-	if not hist then hist = {}; self.State.LocalTrail = hist end
-	local now = self.State.Clock
-	local last = hist[#hist]
-	if last and (now - last.t) < (cfg.Interval or 0.05) then return end
-	hist[#hist + 1] = { t = now, pos = root.Position - Vector3new(0, 2.5, 0) }
-	while #hist > (cfg.Length or 30) do tableremove(hist, 1) end
-end
-
-function EasyESP:RenderLocalTrail()
-	local cfg = self.Settings.Visuals.Trail
-	if not cfg or not cfg.Enabled then return end
-	local hist = self.State.LocalTrail
-	if not hist or #hist < 2 then return end
-	local clock = self.State.Clock
-	for i = 1, #hist - 1 do
-		local a = hist[i]
-		local b = hist[i + 1]
-		local pa, da = self:W2S(a.pos)
-		local pb, db = self:W2S(b.pos)
-		local line = self:GetDrawing("localtrail_" .. i, "Line")
-		if da > 0 and db > 0 then
-			local frac = i / #hist
-			line.Visible = true
-			line.From = pa
-			line.To = pb
-			line.Color = cfg.Rainbow and Color3fromHSV((frac + clock * 0.2) % 1, 1, 1) or cfg.Color
-			line.Thickness = cfg.Thickness or 2
-			line.Transparency = (cfg.Alpha or 0.8) * frac
 		else
-			line.Visible = false
+			self.pool:line(key .. "e" .. i, a[1], a[2], b[1], b[2], color, thick)
 		end
 	end
 end
 
-function EasyESP:ExportVisuals()
-	local function ser(t, indent)
-		local out = {}
-		for k, v in pairs(t) do
-			local key = type(k) == "number" and ("[" .. k .. "]") or tostring(k)
-			if type(v) == "table" then
-				if typeof(v) == "Color3" then
-					out[#out + 1] = indent .. key .. " = Color3.fromRGB(" .. mathfloor(v.R * 255) .. ", " .. mathfloor(v.G * 255) .. ", " .. mathfloor(v.B * 255) .. "),"
-				else
-					out[#out + 1] = indent .. key .. " = {"
-					out[#out + 1] = ser(v, indent .. "  ")
-					out[#out + 1] = indent .. "},"
-				end
-			elseif type(v) == "string" then
-				out[#out + 1] = indent .. key .. ' = "' .. v .. '",'
-			else
-				out[#out + 1] = indent .. key .. " = " .. tostring(v) .. ","
+function ESP:drawPlayer(plr, rig, root, hum, head, lx, ly, bw, bh, dist, visible, lod)
+	local cfg = self.cfg
+	local key = "p" .. plr.UserId
+	local mid = lx + bw / 2
+	local labelsOnly = lod >= 3 and cfg.perf.labelsOnlyFar and cfg.perf.mode ~= "off"
+
+	local accent = cfg.rainbow and hueAt(self.clock * cfg.rainbowRate * 0.1) or cfg.box.color
+	if cfg.wallColors and visible ~= nil then
+		accent = visible and cfg.visible or cfg.hidden
+	end
+	if cfg.pulse.on and hum.MaxHealth > 0 and hum.Health / hum.MaxHealth <= cfg.pulse.threshold then
+		accent = accent:Lerp(cfg.pulse.color, 0.5 + 0.5 * sin(self.clock * cfg.pulse.rate))
+	end
+
+	local hit = self.hits[plr.UserId]
+	if cfg.hit.on and hit and self.clock - hit.at < cfg.hit.life then
+		accent = accent:Lerp(cfg.hit.flash, 1 - (self.clock - hit.at) / cfg.hit.life)
+	end
+
+	if not labelsOnly then
+		if cfg.glow.on then
+			local g = cfg.glow
+			local beat = g.pulse and (0.5 + 0.5 * sin(self.clock * g.rate)) or 1
+			for i = 1, g.layers do
+				local pad = i * g.spread
+				self.pool:rect(key .. "gl" .. i, lx - pad, ly - pad, bw + pad * 2, bh + pad * 2, g.color, false, 1, g.alpha * beat * (1 - (i - 1) / g.layers))
 			end
 		end
-		return table.concat(out, "\n")
+		if cfg.trail.on and lod < 2 then self:drawTrailGhost(key, plr) end
+
+		if cfg.box.on then
+			local b = cfg.box
+			if b.style == "3d" then
+				self:draw3DBox(key, rig, accent, false, b.thickness)
+			elseif b.style == "3dcorner" then
+				self:draw3DBox(key, rig, accent, true, b.thickness)
+			elseif b.style == "corner" then
+				local len = math.min(bw, bh) * b.cornerScale
+				local seg = {
+					lx, ly, lx + len, ly,   lx, ly, lx, ly + len,
+					lx + bw, ly, lx + bw - len, ly,   lx + bw, ly, lx + bw, ly + len,
+					lx, ly + bh, lx + len, ly + bh,   lx, ly + bh, lx, ly + bh - len,
+					lx + bw, ly + bh, lx + bw - len, ly + bh,   lx + bw, ly + bh, lx + bw, ly + bh - len,
+				}
+				for i = 1, 8 do
+					local o = (i - 1) * 4
+					if b.outline then self.pool:line(key .. "co" .. i, seg[o+1], seg[o+2], seg[o+3], seg[o+4], BLACK, b.thickness + 2) end
+					self.pool:line(key .. "c" .. i, seg[o+1], seg[o+2], seg[o+3], seg[o+4], accent, b.thickness)
+				end
+			else
+				if b.outline then self.pool:rect(key .. "bo", lx - 1, ly - 1, bw + 2, bh + 2, BLACK, false, b.thickness + 2) end
+				self.pool:rect(key .. "b", lx, ly, bw, bh, accent, false, b.thickness)
+			end
+			if b.fill then self.pool:rect(key .. "bf", lx, ly, bw, bh, b.fillColor, true, 1, b.fillAlpha) end
+		end
+
+		if cfg.bones.on and lod < 2 then self:drawBones(key, rig, cfg.rainbow and accent or cfg.bones.color, cfg.bones.thickness) end
+
+		if cfg.hp.on and hum.MaxHealth > 0 then
+			local h = cfg.hp
+			local pct = clamp(hum.Health / hum.MaxHealth, 0, 1)
+			local col = h.side ~= "right"
+			local bx = col and lx - 4 - h.thickness or lx + bw + 4
+			if h.outline then self.pool:rect(key .. "ho", bx - 1, ly - 1, h.thickness + 2, bh + 2, BLACK, true, 1, 0.7) end
+			self.pool:rect(key .. "hg", bx, ly, h.thickness, bh, rawc(0.1, 0.1, 0.12), true, 1, 0.6)
+			local barCol = h.gradient and h.low:Lerp(h.full, pct) or (pct < 0.3 and h.low or h.full)
+			local fillH = bh * pct
+			self.pool:rect(key .. "hf", bx, ly + (bh - fillH), h.thickness, math.max(fillH, 1), barCol, true, 1, 1)
+			if h.notch then self.pool:line(key .. "hn", bx, ly + bh * 0.5, bx + h.thickness, ly + bh * 0.5, BLACK, 1, 0.5) end
+			if h.showText and pct < 1 then self.pool:text(key .. "ht", tostring(floor(pct * 100)), bx + h.thickness / 2, ly - 12, 10, rawc(1,1,1), true, FONTS.Plex, true) end
+		end
+
+		if cfg.armor.on then
+			local a = cfg.armor
+			local val = plr:GetAttribute(a.attr)
+			if val then
+				local maxv = plr:GetAttribute(a.maxAttr) or 100
+				local pct = clamp(val / maxv, 0, 1)
+				local ay = ly + bh + 3
+				if a.outline then self.pool:rect(key .. "ao", lx - 1, ay - 1, bw + 2, a.thickness + 2, BLACK, true, 1, 0.7) end
+				self.pool:rect(key .. "ag", lx, ay, bw, a.thickness, rawc(0.1, 0.1, 0.12), true, 1, 0.6)
+				self.pool:rect(key .. "af", lx, ay, bw * pct, a.thickness, a.color, true, 1, 1)
+			end
+		end
+
+		if cfg.headDot.on and head then
+			local hx, hy, hd = self:project(head.Position)
+			if hd > 0 then self.pool:dot(key .. "hd", hx, hy, clamp(cfg.headDot.size, 1, 15), cfg.rainbow and accent or cfg.headDot.color, true, 1, 12) end
+		end
+		if cfg.gaze.on and head then
+			local hx, hy, hd = self:project(head.Position)
+			local gx, gy, gd = self:project(head.Position + head.CFrame.LookVector * cfg.gaze.length)
+			if hd > 0 and gd > 0 then self.pool:line(key .. "gz", hx, hy, gx, gy, cfg.rainbow and accent or cfg.gaze.color, 1) end
+		end
+		if cfg.tracer.on then
+			local vp = cam.ViewportSize
+			local ox, oy = vp.X / 2, vp.Y
+			local from = cfg.tracer.from
+			if from == "center" then oy = vp.Y / 2 elseif from == "top" then oy = 0 elseif from == "mouse" then local m = Input:GetMouseLocation() ox, oy = m.X, m.Y end
+			self.pool:line(key .. "tr", ox, oy, mid, ly + bh, cfg.rainbow and accent or cfg.tracer.color, cfg.tracer.thickness)
+		end
 	end
-	return "{\n" .. ser(self.Settings.Visuals, "  ") .. "\n}"
+
+	local topY = ly - 4
+	if cfg.name.on then
+		local n = cfg.name
+		local label = n.showUser and ("@" .. plr.Name) or plr.DisplayName
+		topY = topY - n.size
+		if n.shadow then self.pool:text(key .. "nsh", label, mid + 1, topY + 1, n.size, BLACK, true, n.font, false) end
+		self.pool:text(key .. "n", label, mid, topY, n.size, cfg.wallColors and accent or n.color, true, n.font, true)
+	end
+
+	local below = ly + bh + 3
+	if cfg.gun.on then
+		local g = self.gunOf(plr)
+		if g then
+			local ammo = plr:GetAttribute(cfg.gun.ammoAttr)
+			if ammo then g = g .. " [" .. tostring(ammo) .. "]" end
+			self.pool:text(key .. "g", g, mid, below, cfg.gun.size, cfg.gun.color, true, FONTS.Plex, true)
+			below = below + cfg.gun.size
+		end
+	end
+	if cfg.dist.on then
+		self.pool:text(key .. "d", floor(dist) .. cfg.dist.suffix, mid, below, cfg.dist.size, cfg.dist.color, true, FONTS.Plex, true)
+	end
+
+	if cfg.flags.on and not labelsOnly then
+		self:drawFlags(key, lx, ly, bw, { plr = plr, rig = rig, root = root, hum = hum, head = head, dist = dist, visible = visible, esp = self })
+	end
+
+	if cfg.hit.on and cfg.hit.showDmg and hit and self.clock - hit.at < cfg.hit.life and hit.dmg and hit.dmg > 0 then
+		local prog = (self.clock - hit.at) / cfg.hit.life
+		self.pool:text(key .. "dm", "-" .. hit.dmg, mid + 20, ly + bh * 0.3 - prog * 15, 13, cfg.hit.dmgColor, true, FONTS.Plex, true)
+	end
+
+	if not labelsOnly then
+		local foot = self:footOf(root, hum)
+		if cfg.rings.on and cfg.rings.onEnemies then
+			for i, spec in ipairs(cfg.rings.specs) do
+				self:paintRing(key .. "rg" .. i, foot.X, foot.Y, foot.Z, spec, i, lod)
+			end
+		end
+		if cfg.ball.on and cfg.ball.onEnemies then
+			local b = cfg.ball
+			local col = b.fx == "rainbow" and hueAt(self.clock * 0.15) or b.color
+			self:worldBall(key .. "bl", root.Position.X, root.Position.Y, root.Position.Z, b.radius, b.rings, scaleSides(self.cfg.perf.ballDetail, lod), col, b.thickness, b.alpha, self.clock * (b.spin or 0))
+		end
+		if cfg.fx.onEnemies and not (lod >= 3 and cfg.perf.dropFxFar) then
+			self:drawFx(key, foot, root.Position, lod)
+		end
+		for _, hook in pairs(self.tagHooks) do
+			pcall(hook, self, plr, rig, lx, ly, bw, bh, dist)
+		end
+	end
 end
 
-function EasyESP:RenderFovCircle()
-	local cfg = self.Settings.Visuals.FovCircle
-	if not cfg or not cfg.Enabled then return end
-	local viewport = Camera.ViewportSize
-	local center = Vector2new(viewport.X / 2, viewport.Y / 2)
-	local color = cfg.Rainbow and Color3fromHSV((self.State.Clock * 0.2) % 1, 1, 1) or cfg.Color
+function ESP:drawFx(key, foot, mid, lod)
+	local fx = self.cfg.fx
+	local t = self.clock
+	local density = self.cfg.perf.fxDensity
+	if lod >= 2 then density = density * 0.5 end
+	local fx0, fy0, fz0 = foot.X, foot.Y, foot.Z
+	local mx, my, mz = mid.X, mid.Y, mid.Z
 
-	local circle = self:GetDrawing("fovcircle", "Circle")
-	circle.Visible = true
-	circle.Position = center
-	circle.Radius = cfg.Radius
-	circle.Color = color
-	circle.Thickness = cfg.Thickness or 1
-	circle.Filled = false
-	circle.NumSides = cfg.Sides or 64
-	circle.Transparency = cfg.Alpha or 1
+	if fx.confetti.on then
+		local c = fx.confetti
+		for i = 1, math.max(1, floor(c.count * density)) do
+			local ang = jitter(i) * TAU
+			local rad = c.radius * (0.3 + 0.7 * jitter(i * 1.7))
+			local ph = (t * c.speed * (0.7 + 0.6 * jitter(i * 2.3)) * 0.1 + jitter(i * 3.1)) % 1
+			local sway = sin(t * 3 + i) * 0.6
+			local col = c.rainbow and hueAt(jitter(i * 5.9) + t * 0.2) or c.color
+			self:worldSpark(key .. "cf" .. i, fx0 + cos(ang) * rad + sway, fy0 + c.height * (1 - ph), fz0 + sin(ang) * rad, c.size * (0.6 + 0.5 * (1 - ph)), col, clamp(ph * 3, 0, 1))
+		end
+	end
 
-	if cfg.Filled then
-		local fill = self:GetDrawing("fovcircle_fill", "Circle")
-		fill.Visible = true
-		fill.Position = center
-		fill.Radius = cfg.Radius
-		fill.Color = color
-		fill.Filled = true
-		fill.NumSides = cfg.Sides or 64
-		fill.Transparency = cfg.FillAlpha or 0.05
+	if fx.rain.on then
+		local r = fx.rain
+		for i = 1, math.max(1, floor(r.count * density)) do
+			local ang = jitter(i * 1.3) * TAU
+			local rad = r.radius * jitter(i * 2.7)
+			local ph = (t * r.speed + jitter(i) * r.height) % r.height
+			local yt = r.height - ph
+			local ax, ay, ad = self:project(v3(fx0 + cos(ang) * rad, fy0 + yt, fz0 + sin(ang) * rad))
+			local bx, by, bd = self:project(v3(fx0 + cos(ang) * rad, fy0 + yt - r.length, fz0 + sin(ang) * rad))
+			if ad > 0 and bd > 0 then
+				local col = r.rainbow and hsv((t * 0.1 + jitter(i)) % 1, 0.6, 1) or r.color
+				self.pool:line(key .. "rn" .. i, ax, ay, bx, by, col, 1, r.alpha)
+			end
+		end
+	end
+
+	if fx.synth.on then
+		local s = fx.synth
+		for i = 1, s.rings do
+			local frac = ((t * s.speed * 0.1) + i / s.rings) % 1
+			local rad = math.max(s.radius * frac, 0.1)
+			local y = s.rise and s.radius * frac * 0.4 or 0
+			self:worldRing(key .. "sy" .. i, fx0, fy0 + y, fz0, scaleSides(s.sides, lod), hsv((s.hue + frac * s.hueSpan) % 1, 1, 1), s.thickness, s.alpha * (1 - frac), 0, { glow = true, glowAlpha = s.alpha * (1 - frac) * 0.4 })
+		end
+	end
+
+	if fx.orbit.on then
+		local o = fx.orbit
+		for i = 1, o.count do
+			local base = (i / o.count) * TAU
+			local ang = t * o.speed + base
+			local col = o.rainbow and hueAt(t * 0.2 + i / o.count) or o.color
+			self:worldSpark(key .. "ob" .. i, mx + cos(ang) * o.radius, my + sin(t * o.speed * 1.3 + base) * o.lift, mz + sin(ang) * o.radius, o.size, col, 1)
+			if o.trail and lod < 2 then
+				for k = 1, o.trailLen do
+					local ta = ang - k * 0.12
+					self:worldSpark(key .. "obt" .. i .. "_" .. k, mx + cos(ta) * o.radius, my + sin(t * o.speed * 1.3 + base - k * 0.12) * o.lift, mz + sin(ta) * o.radius, o.size * (1 - k / (o.trailLen + 1)), col, 1 - k / (o.trailLen + 1))
+				end
+			end
+		end
+	end
+
+	if fx.spiral.on then
+		local s = fx.spiral
+		local px, py, pd
+		for i = 0, s.points do
+			local frac = i / s.points
+			local ang = frac * TAU * s.turns + t * s.speed
+			local rad = s.radius * frac
+			local x, y, d = self:project(v3(fx0 + cos(ang) * rad, fy0 + s.height * frac, fz0 + sin(ang) * rad))
+			if px and pd > 0 and d > 0 then
+				self.pool:line(key .. "sp" .. i, px, py, x, y, s.rainbow and hueAt(frac + t * 0.2) or s.color, s.thickness, s.alpha)
+			end
+			px, py, pd = x, y, d
+		end
+	end
+
+	if fx.vortex.on then
+		local vx = fx.vortex
+		for i = 1, math.max(1, floor(vx.count * density)) do
+			local base = jitter(i) * TAU
+			local life = (t * vx.speed * 0.1 + jitter(i * 2.1)) % 1
+			local rad = vx.radius * (1 - life)
+			local ang = base + life * TAU * vx.twist
+			local col = vx.rainbow and hueAt(life + t * 0.2) or vx.color
+			self:worldSpark(key .. "vx" .. i, fx0 + cos(ang) * rad, fy0 + vx.height * life, fz0 + sin(ang) * rad, vx.size * (1 - life * 0.5), col, clamp(life * 2, 0, 1))
+		end
+	end
+
+	if fx.shock.on then
+		local s = fx.shock
+		for w = 1, s.waves do
+			local frac = ((t * s.speed * 0.1) + w / s.waves) % 1
+			self:worldRing(key .. "sh" .. w, fx0, fy0, fz0, math.max(s.radius * frac, 0.1), scaleSides(s.sides, lod), s.color, s.thickness, s.alpha * (1 - frac), 0, { glow = true, glowAlpha = s.alpha * (1 - frac) * 0.5 })
+		end
+	end
+
+	if fx.aura.on then
+		local au = fx.aura
+		local sides = scaleSides(au.sides, lod)
+		for i = 1, au.rings do
+			local ang = t * au.speed * (i % 2 == 0 and 1 or -1)
+			local tilt = (i / au.rings) * pi
+			local px, py, pd
+			for s = 0, sides do
+				local a = (s / sides) * TAU
+				local ax = cos(a) * au.radius
+				local ay = sin(a) * au.radius * sin(tilt)
+				local az = sin(a) * au.radius * cos(tilt)
+				local rx = ax * cos(ang) - az * sin(ang)
+				local rz = ax * sin(ang) + az * cos(ang)
+				local x, y, d = self:project(v3(mx + rx, my + ay, mz + rz))
+				if px and pd > 0 and d > 0 then
+					self.pool:line(key .. "au" .. i .. "_" .. s, px, py, x, y, au.rainbow and hueAt(i / au.rings + t * 0.15) or au.color, au.thickness, au.alpha)
+				end
+				px, py, pd = x, y, d
+			end
+		end
+	end
+
+	if fx.flies.on then
+		local ff = fx.flies
+		for i = 1, math.max(1, floor(ff.count * density)) do
+			local tt = t * ff.speed * 0.1
+			local ax = sin(tt + jitter(i) * TAU) * ff.radius
+			local az = cos(tt * 1.3 + jitter(i * 2.1) * TAU) * ff.radius
+			local ay = ff.height * (0.3 + 0.7 * (0.5 + 0.5 * sin(tt * 2 + i)))
+			local flick = 0.4 + 0.6 * (0.5 + 0.5 * sin(t * 8 + i * 1.7))
+			local col = ff.rainbow and hsv((jitter(i) + t * 0.1) % 1, 0.7, 1) or ff.color
+			self:worldSpark(key .. "fl" .. i, fx0 + ax, fy0 + ay, fz0 + az, ff.size * flick, col, flick)
+		end
+	end
+
+	if fx.bolt.on and lod < 2 then
+		local b = fx.bolt
+		for j = 1, b.count do
+			local stamp = floor(t * b.speed + j)
+			local seed = stamp * 13.1 + j * 7.3
+			local ang = jitter(seed) * TAU
+			local flash = 1 - (t * b.speed % 1)
+			local prev = v3(fx0 + cos(ang) * b.radius, fy0 + b.height, fz0 + sin(ang) * b.radius)
+			for s = 1, b.segs do
+				local frac = s / b.segs
+				local jx = (jitter(seed + s) - 0.5) * b.jitter
+				local jz = (jitter(seed + s * 2.3) - 0.5) * b.jitter
+				local cur = v3(fx0 + cos(ang) * b.radius * (1 - frac) + jx, fy0 + b.height * (1 - frac), fz0 + sin(ang) * b.radius * (1 - frac) + jz)
+				local ax, ay, ad = self:project(prev)
+				local bx, by, bd = self:project(cur)
+				if ad > 0 and bd > 0 then
+					self.pool:line(key .. "bo" .. j .. "_" .. s, ax, ay, bx, by, b.color, b.thickness, clamp(flash * b.alpha, 0, 1))
+				end
+				prev = cur
+			end
+		end
+	end
+
+	if fx.helix.on then
+		local hx = fx.helix
+		for strand = 0, hx.strands - 1 do
+			local off = (strand / hx.strands) * TAU
+			local px, py, pd
+			for i = 0, hx.points do
+				local frac = i / hx.points
+				local ang = frac * TAU * hx.turns + t * hx.speed + off
+				local x, y, d = self:project(v3(mx + cos(ang) * hx.radius, my + hx.height * frac - hx.height / 2, mz + sin(ang) * hx.radius))
+				if px and pd > 0 and d > 0 then
+					self.pool:line(key .. "hx" .. strand .. "_" .. i, px, py, x, y, hx.rainbow and hueAt(frac + t * 0.2) or hx.color, hx.thickness, hx.alpha)
+				end
+				px, py, pd = x, y, d
+			end
+		end
+	end
+
+	if fx.pulse.on then
+		local p = fx.pulse
+		local beat = (t * p.speed) % 1
+		local swell = beat < 0.15 and beat / 0.15 or math.max(0, 1 - (beat - 0.15) / 0.85)
+		self:worldRing(key .. "pl", fx0, fy0, fz0, p.radius * (0.6 + 0.4 * swell), scaleSides(p.sides, lod), p.color, p.thickness, p.alpha * (0.4 + 0.6 * swell), 0, { glow = true, glowAlpha = 0.3 * swell })
+	end
+
+	if fx.tornado.on then
+		local tn = fx.tornado
+		for i = 1, math.max(1, floor(tn.count * density)) do
+			local seed = jitter(i)
+			local life = (t * tn.speed * 0.1 + seed) % 1
+			local rad = tn.radius * (0.2 + 0.8 * (1 - life))
+			local ang = seed * TAU + t * tn.spin + life * TAU * tn.twist
+			local col = tn.rainbow and hsv((life + t * 0.15) % 1, 0.8, 1) or tn.color
+			self:worldSpark(key .. "tn" .. i, fx0 + cos(ang) * rad, fy0 + tn.height * life, fz0 + sin(ang) * rad, tn.size * (0.5 + life * 0.5), col, clamp((1 - life) * 2, 0, 1))
+		end
+	end
+
+	if fx.portal.on then
+		local po = fx.portal
+		for i = 1, po.rings do
+			local frac = i / po.rings
+			local rad = po.radius * frac + sin(t * po.speed + i) * 0.3
+			self:worldRing(key .. "po" .. i, fx0, fy0, fz0, rad, scaleSides(po.sides, lod), hsv((po.hue + frac * 0.3 + t * 0.1) % 1, 1, 1), po.thickness, po.alpha, t * po.spin * (i % 2 == 0 and 1 or -1), { glow = true, glowAlpha = po.alpha * 0.4 })
+		end
+	end
+
+	if fx.snow.on then
+		local sn = fx.snow
+		for i = 1, math.max(1, floor(sn.count * density)) do
+			local seed = jitter(i)
+			local ang = seed * TAU
+			local rad = sn.radius * jitter(i * 1.7)
+			local ph = (t * sn.speed * 0.1 + seed) % 1
+			self:worldSpark(key .. "sn" .. i, fx0 + cos(ang) * rad + sin(t * 2 + i) * 0.8, fy0 + sn.height * (1 - ph), fz0 + sin(ang) * rad, sn.size, sn.color, sn.alpha)
+		end
+	end
+
+	if fx.embers.on then
+		local em = fx.embers
+		for i = 1, math.max(1, floor(em.count * density)) do
+			local seed = jitter(i)
+			local ang = seed * TAU
+			local rad = em.radius * jitter(i * 2.3) * (0.5 + 0.5 * sin(t + i))
+			local ph = (t * em.speed * 0.1 + seed) % 1
+			local heat = 1 - ph
+			self:worldSpark(key .. "em" .. i, fx0 + cos(ang) * rad, fy0 + em.height * ph, fz0 + sin(ang) * rad, em.size * heat, rgb(255, floor(120 + 100 * heat), floor(40 * heat)), clamp(heat * 1.5, 0, 1))
+		end
+	end
+
+	if fx.radar.on then
+		local ra = fx.radar
+		self:worldRing(key .. "rab", fx0, fy0, fz0, ra.radius, scaleSides(ra.sides, lod), ra.color, 1, ra.alpha * 0.4, 0, nil)
+		self:worldSweep(key .. "ras", fx0, fy0, fz0, ra.radius, t * ra.speed, ra.arc, scaleSides(20, lod), ra.color, ra.thickness, ra.alpha)
+	end
+
+	if fx.burst.on then
+		local bu = fx.burst
+		self:worldStar(key .. "bu", mx, my, mz, bu.outer, bu.inner, bu.points, bu.rainbow and hueAt(t * 0.2) or bu.color, bu.thickness, bu.alpha, t * bu.spin)
 	end
 end
 
-function EasyESP:RenderCrosshair()
-	local cfg = self.Settings.Visuals.Crosshair
-	if not cfg or not cfg.Enabled then return end
-	local viewport = Camera.ViewportSize
-	local cx, cy = viewport.X / 2, viewport.Y / 2
-	local color = cfg.Rainbow and Color3fromHSV((self.State.Clock * 0.3) % 1, 1, 1) or cfg.Color
-	local gap = cfg.Gap or 4
-	local len = cfg.Length or 8
-	local th = cfg.Thickness or 1
-	local a = cfg.Alpha or 1
+function ESP:drawSelfTrail()
+	local t = self.cfg.self.trail
+	if not t.on then return end
+	local rig = me.Character
+	local root = rig and rig:FindFirstChild("HumanoidRootPart")
+	if not root then return end
+	local hist = self.myTrail
+	local last = hist[#hist]
+	if not last or self.clock - last.at >= t.gap then
+		insert(hist, { at = self.clock, pos = root.Position - v3(0, 2.5, 0) })
+		while #hist > t.ticks do remove(hist, 1) end
+	end
+	if #hist < 2 then return end
+	for i = 1, #hist - 1 do
+		local ax, ay, ad = self:project(hist[i].pos)
+		local bx, by, bd = self:project(hist[i + 1].pos)
+		if ad > 0 and bd > 0 then
+			local frac = i / #hist
+			self.pool:line("mt" .. i, ax, ay, bx, by, t.rainbow and hueAt(frac + self.clock * 0.2) or t.color, t.thickness, t.alpha * frac)
+		end
+	end
+end
 
-	local segs = {
-		{ Vector2new(cx - gap - len, cy), Vector2new(cx - gap, cy) },
-		{ Vector2new(cx + gap, cy), Vector2new(cx + gap + len, cy) },
-		{ Vector2new(cx, cy - gap - len), Vector2new(cx, cy - gap) },
-		{ Vector2new(cx, cy + gap), Vector2new(cx, cy + gap + len) },
+function ESP:drawFov()
+	local f = self.cfg.self.fov
+	if not f.on then return end
+	local vp = cam.ViewportSize
+	local col = f.rainbow and hueAt(self.clock * 0.2) or f.color
+	self.pool:dot("fov", vp.X / 2, vp.Y / 2, f.radius, col, false, f.alpha, f.sides).Thickness = f.thickness
+	if f.fill then self.pool:dot("fovf", vp.X / 2, vp.Y / 2, f.radius, col, true, f.fillAlpha, f.sides) end
+end
+
+function ESP:drawCross()
+	local c = self.cfg.self.cross
+	if not c.on then return end
+	local vp = cam.ViewportSize
+	local cx, cy = vp.X / 2, vp.Y / 2
+	local col = c.rainbow and hueAt(self.clock * 0.3) or c.color
+	local seg = {
+		cx - c.gap - c.length, cy, cx - c.gap, cy,
+		cx + c.gap, cy, cx + c.gap + c.length, cy,
+		cx, cy - c.gap - c.length, cx, cy - c.gap,
+		cx, cy + c.gap, cx, cy + c.gap + c.length,
 	}
-	for i, s in ipairs(segs) do
-		if cfg.Outline then
-			local o = self:GetDrawing("xhair_o_" .. i, "Line")
-			o.Visible = true o.From = s[1] o.To = s[2]
-			o.Color = Color3new(0, 0, 0) o.Thickness = th + 2 o.Transparency = a
-		end
-		local l = self:GetDrawing("xhair_" .. i, "Line")
-		l.Visible = true l.From = s[1] l.To = s[2]
-		l.Color = color l.Thickness = th l.Transparency = a
+	for i = 1, 4 do
+		local o = (i - 1) * 4
+		if c.outline then self.pool:line("xo" .. i, seg[o+1], seg[o+2], seg[o+3], seg[o+4], BLACK, c.thickness + 2, c.alpha) end
+		self.pool:line("xh" .. i, seg[o+1], seg[o+2], seg[o+3], seg[o+4], col, c.thickness, c.alpha)
 	end
-	if cfg.Dot then
-		local d = self:GetDrawing("xhair_dot", "Circle")
-		d.Visible = true d.Position = Vector2new(cx, cy)
-		d.Radius = cfg.DotSize or 1 d.Filled = true d.Color = color d.Transparency = a
-	end
+	if c.dot then self.pool:dot("xd", cx, cy, c.dotSize, col, true, c.alpha, 10) end
 end
 
-function EasyESP:RenderRings(id, footPos, clock)
-	local cfg = self.Settings.Visuals.Rings
-	for i, ring in ipairs(cfg.List) do
-		local r = {
-			Radius = ring.Radius, Color = ring.Color, Color2 = ring.Color2,
-			GradientColor = ring.GradientColor, Thickness = ring.Thickness,
-			Alpha = ring.Alpha, Segments = ring.Segments or cfg.Segments,
-			Style = ring.Style, DashGap = ring.DashGap, Effect = ring.Effect,
-			Spin = ring.Spin, Pulse = ring.Pulse, PulseSpeed = ring.PulseSpeed,
-			Filled = ring.Filled, FillAlpha = ring.FillAlpha, Glow = ring.Glow,
-			GlowAlpha = ring.GlowAlpha, Gradient = ring.Gradient, Ticks = ring.Ticks,
-			TickLen = ring.TickLen, TickUp = ring.TickUp,
-		}
-		self:DrawRingSpec(id .. "_ring_" .. i, footPos + Vector3new(0, cfg.Height, 0), r, clock, i)
-	end
-end
+function ESP:drawPreview()
+	local pv = self.cfg.self.preview
+	if not pv.on then return end
+	local vp = cam.ViewportSize
+	local bw, bh = pv.w, pv.h
+	local lx = pv.x
+	local ly = pv.y ~= 0 and pv.y or vp.Y * 0.5 - bh * 0.5
+	local mid = lx + bw / 2
+	local cfg = self.cfg
+	local rig = me.Character
+	local hum = rig and rig:FindFirstChildOfClass("Humanoid")
+	local hp, maxHp = pv.fakeHp, 100
+	if hum and hp < 0 then hp, maxHp = hum.Health, hum.MaxHealth elseif hp < 0 then hp = 100 end
+	local pct = maxHp > 0 and hp / maxHp or 1
+	local accent = cfg.rainbow and hueAt(self.clock * cfg.rainbowRate * 0.1) or cfg.box.color
 
-function EasyESP:RenderSphere(id, center, clock)
-	local cfg = self.Settings.Visuals.Sphere
-	local color = cfg.Color
-	if cfg.Effect == "Rainbow" then color = Color3fromHSV((clock * 0.15) % 1, 1, 1) end
-	self:DrawWorldSphere(id, center, cfg.Radius, cfg.Rings, cfg.Segments, color, cfg.Thickness, cfg.Alpha, clock * (cfg.Spin or 0))
-end
-
-local function rnd(seed)
-	local x = mathsin(seed * 127.1 + 311.7) * 43758.5453
-	return x - mathfloor(x)
-end
-
-function EasyESP:RenderEffects(id, footPos, centerPos, clock)
-	local e = self.Settings.Visuals.Effects
-
-	if e.Confetti.Enabled then
-		local c = e.Confetti
-		for i = 1, c.Count do
-			local ang = rnd(i) * TAU
-			local rad = c.Radius * (0.3 + 0.7 * rnd(i * 1.7))
-			local speed = c.Speed * (0.7 + 0.6 * rnd(i * 2.3))
-			local phase = (clock * speed * 0.1 + rnd(i * 3.1)) % 1
-			local y = c.Height * (1 - phase)
-			local sway = mathsin(clock * 3 + i) * 0.6
-			local wp = footPos + Vector3new(mathcos(ang) * rad + sway, y, mathsin(ang) * rad)
-			local col = c.Rainbow and Color3fromHSV((rnd(i * 5.9) + clock * 0.2) % 1, 1, 1) or c.Color
-			self:DrawWorldDot(id .. "_cf_" .. i, wp, c.Size * (0.6 + 0.5 * (1 - phase)), col, mathclamp(phase * 3, 0, 1))
+	if cfg.glow.on then
+		local g = cfg.glow
+		for i = 1, g.layers do
+			local pad = i * g.spread
+			self.pool:rect("pvg" .. i, lx - pad, ly - pad, bw + pad * 2, bh + pad * 2, g.color, false, 1, g.alpha * (1 - (i - 1) / g.layers))
 		end
 	end
+	if cfg.box.on then
+		local b = cfg.box
+		if b.style == "corner" then
+			local len = math.min(bw, bh) * b.cornerScale
+			local seg = {
+				lx, ly, lx + len, ly,   lx, ly, lx, ly + len,
+				lx + bw, ly, lx + bw - len, ly,   lx + bw, ly, lx + bw, ly + len,
+				lx, ly + bh, lx + len, ly + bh,   lx, ly + bh, lx, ly + bh - len,
+				lx + bw, ly + bh, lx + bw - len, ly + bh,   lx + bw, ly + bh, lx + bw, ly + bh - len,
+			}
+			for i = 1, 8 do
+				local o = (i - 1) * 4
+				if b.outline then self.pool:line("pvc0" .. i, seg[o+1], seg[o+2], seg[o+3], seg[o+4], BLACK, b.thickness + 2) end
+				self.pool:line("pvc" .. i, seg[o+1], seg[o+2], seg[o+3], seg[o+4], accent, b.thickness)
+			end
+		else
+			if b.outline then self.pool:rect("pvbo", lx - 1, ly - 1, bw + 2, bh + 2, BLACK, false, b.thickness + 2) end
+			self.pool:rect("pvb", lx, ly, bw, bh, accent, false, b.thickness)
+		end
+	end
+	if cfg.hp.on then
+		local h = cfg.hp
+		local bx = lx - 4 - h.thickness
+		self.pool:rect("pvho", bx - 1, ly - 1, h.thickness + 2, bh + 2, BLACK, true, 1, 0.7)
+		self.pool:rect("pvhg", bx, ly, h.thickness, bh, rawc(0.1,0.1,0.12), true, 1, 0.6)
+		local fillH = bh * pct
+		self.pool:rect("pvhf", bx, ly + (bh - fillH), h.thickness, math.max(fillH, 1), h.gradient and h.low:Lerp(h.full, pct) or h.full, true, 1, 1)
+	end
+	if cfg.name.on then
+		self.pool:text("pvn", me.DisplayName, mid, ly - 4 - cfg.name.size, cfg.name.size, cfg.name.color, true, cfg.name.font, true)
+	end
+	self.pool:text("pvlbl", "PREVIEW", mid, ly + bh + 6, 11, rgb(120, 120, 130), true, FONTS.Plex, true)
+end
 
-	if e.Rain.Enabled then
-		local r = e.Rain
-		for i = 1, r.Count do
-			local ang = rnd(i * 1.3) * TAU
-			local rad = r.Radius * rnd(i * 2.7)
-			local phase = (clock * r.Speed + rnd(i) * r.Height) % r.Height
-			local yTop = r.Height - phase
-			local top = footPos + Vector3new(mathcos(ang) * rad, yTop, mathsin(ang) * rad)
-			local bot = top - Vector3new(0, r.Length, 0)
-			local sp1, d1 = self:W2S(top)
-			local sp2, d2 = self:W2S(bot)
-			local line = self:GetDrawing(id .. "_rain_" .. i, "Line")
-			if d1 > 0 and d2 > 0 then
-				line.Visible = true
-				line.From = sp1
-				line.To = sp2
-				line.Color = r.Rainbow and Color3fromHSV((clock * 0.1 + rnd(i)) % 1, 0.6, 1) or r.Color
-				line.Thickness = 1
-				line.Transparency = r.Alpha
+function ESP:markHit(uid, dmg)
+	self.hits[uid] = { at = self.clock, dmg = dmg }
+end
+
+function ESP:trackHealth(plr, hum)
+	local uid = plr.UserId
+	local was = self.hpMem[uid]
+	if was and hum.Health < was then self:markHit(uid, floor(was - hum.Health)) end
+	self.hpMem[uid] = hum.Health
+end
+
+function ESP:recordGhost(plr, rig)
+	local t = self.cfg.trail
+	if not t.on then return end
+	local uid = plr.UserId
+	local hist = self.btrk[uid] or {}
+	self.btrk[uid] = hist
+	local last = hist[#hist]
+	if last and self.clock - last.at < t.gap then return end
+	local set = rig:FindFirstChild("UpperTorso") and RIG15 or RIG6
+	local joints = {}
+	for _, bone in ipairs(set) do
+		for _, name in ipairs(bone) do
+			if not joints[name] then
+				local part = rig:FindFirstChild(name)
+				if part then joints[name] = part.Position end
+			end
+		end
+	end
+	insert(hist, { at = self.clock, set = set, joints = joints })
+	while #hist > t.ticks do remove(hist, 1) end
+end
+
+local function serialize(node, pad)
+	local out = {}
+	for k, val in pairs(node) do
+		local key = type(k) == "number" and "[" .. k .. "]" or k
+		if typeof(val) == "Color3" then
+			out[#out+1] = pad .. key .. " = Color3.fromRGB(" .. floor(val.R*255) .. "," .. floor(val.G*255) .. "," .. floor(val.B*255) .. "),"
+		elseif type(val) == "table" then
+			out[#out+1] = pad .. key .. " = {"
+			out[#out+1] = serialize(val, pad .. "  ")
+			out[#out+1] = pad .. "},"
+		elseif type(val) == "string" then
+			out[#out+1] = pad .. key .. ' = "' .. val .. '",'
+		else
+			out[#out+1] = pad .. key .. " = " .. tostring(val) .. ","
+		end
+	end
+	return table.concat(out, "\n")
+end
+
+function ESP:export()
+	return "return {\n" .. serialize(self.cfg, "  ") .. "\n}"
+end
+
+function ESP:import(source)
+	local chunk = loadstring(source)
+	if not chunk then return false end
+	local ok, loaded = pcall(chunk)
+	if not ok or type(loaded) ~= "table" then return false end
+	merge(self.cfg, loaded)
+	return true
+end
+
+function ESP:save(name)
+	if not isfolder("EasyESP") then makefolder("EasyESP") end
+	writefile("EasyESP/" .. name .. ".txt", self:export())
+end
+
+function ESP:load(name)
+	local path = "EasyESP/" .. name .. ".txt"
+	if not isfile(path) then return false end
+	return self:import(readfile(path))
+end
+
+function ESP:configs()
+	if not isfolder("EasyESP") then return {} end
+	local names = {}
+	for _, path in ipairs(listfiles("EasyESP")) do
+		local n = path:match("([^/\\]+)%.txt$")
+		if n then names[#names+1] = n end
+	end
+	return names
+end
+
+function ESP:onDraw(name, fn) self.tagHooks[name] = fn end
+function ESP:removeDraw(name) self.tagHooks[name] = nil end
+
+function ESP:collectRoster()
+	local eye = cam.CFrame.Position
+	local roster, n = self.roster, 0
+	for _, plr in ipairs(Players:GetPlayers()) do
+		if plr ~= me then
+			local rig = plr.Character
+			local root = rig and rig:FindFirstChild("HumanoidRootPart")
+			local hum = rig and rig:FindFirstChildOfClass("Humanoid")
+			if not root or not hum or hum.Health <= 0 then
+				local h = self.hl[plr.UserId]
+				if h then h.Enabled = false end
+				if self.mat[plr.UserId] then self:dropMatCham(plr.UserId) end
 			else
-				line.Visible = false
-			end
-		end
-	end
-
-	if e.Synth.Enabled then
-		local sy = e.Synth
-		for ri = 1, sy.Rings do
-			local prog = (clock * sy.Speed * 0.1) + (ri / sy.Rings)
-			local frac = prog % 1
-			local radius = mathmax(sy.Radius * frac, 0.1)
-			local y = sy.Rise and (sy.Radius * frac * 0.4) or sy.Height
-			local hue = (sy.Hue + frac * sy.HueRange) % 1
-			self:DrawWorldRing(id .. "_synth_" .. ri, footPos + Vector3new(0, y, 0), radius, sy.Segments, Color3fromHSV(hue, 1, 1), sy.Thickness, sy.Alpha * (1 - frac), 0, { glow = true, glowAlpha = sy.Alpha * (1 - frac) * 0.4 })
-		end
-	end
-
-	if e.Orbit.Enabled then
-		local o = e.Orbit
-		for i = 1, o.Count do
-			local base = (i / o.Count) * TAU
-			local ang = clock * o.Speed + base
-			local vy = mathsin(clock * o.Speed * 1.3 + base) * o.Vertical
-			local wp = centerPos + Vector3new(mathcos(ang) * o.Radius, vy, mathsin(ang) * o.Radius)
-			local col = o.Rainbow and Color3fromHSV((clock * 0.2 + i / o.Count) % 1, 1, 1) or o.Color
-			self:DrawWorldDot(id .. "_orbit_" .. i, wp, o.Size, col, 1)
-			if o.Trail then
-				for tr = 1, o.TrailLen or 5 do
-					local ta = ang - tr * 0.12
-					local tvy = mathsin(clock * o.Speed * 1.3 + base - tr * 0.12) * o.Vertical
-					local twp = centerPos + Vector3new(mathcos(ta) * o.Radius, tvy, mathsin(ta) * o.Radius)
-					self:DrawWorldDot(id .. "_orbtr_" .. i .. "_" .. tr, twp, o.Size * (1 - tr / ((o.TrailLen or 5) + 1)), col, 1 - tr / ((o.TrailLen or 5) + 1))
+				local dist = (eye - root.Position).Magnitude
+				if dist <= self.cfg.maxRange then
+					n = n + 1
+					local slot = roster[n]
+					if slot then
+						slot.plr, slot.rig, slot.root, slot.hum, slot.dist = plr, rig, root, hum, dist
+					else
+						roster[n] = { plr = plr, rig = rig, root = root, hum = hum, dist = dist }
+					end
 				end
 			end
 		end
 	end
-
-	if e.Spiral and e.Spiral.Enabled then
-		local sp = e.Spiral
-		local turns = sp.Turns or 3
-		local pts = sp.Points or 60
-		local prev
-		for i = 0, pts do
-			local frac = i / pts
-			local ang = frac * TAU * turns + clock * sp.Speed
-			local rad = sp.Radius * frac
-			local y = sp.Height * frac
-			local cur = self:W2S(footPos + Vector3new(mathcos(ang) * rad, y, mathsin(ang) * rad))
-			local _, depth = self:W2S(footPos + Vector3new(mathcos(ang) * rad, y, mathsin(ang) * rad))
-			if prev and prev.d > 0 and depth > 0 then
-				local line = self:GetDrawing(id .. "_spiral_" .. i, "Line")
-				line.Visible = true
-				line.From = Vector2new(prev.x, prev.y)
-				line.To = cur
-				line.Color = sp.Rainbow and Color3fromHSV((frac + clock * 0.2) % 1, 1, 1) or sp.Color
-				line.Thickness = sp.Thickness or 1
-				line.Transparency = sp.Alpha or 0.8
-			end
-			prev = { x = cur.X, y = cur.Y, d = depth }
-		end
-	end
-
-	if e.Vortex and e.Vortex.Enabled then
-		local vx = e.Vortex
-		for i = 1, vx.Particles do
-			local base = rnd(i) * TAU
-			local life = (clock * vx.Speed * 0.1 + rnd(i * 2.1)) % 1
-			local rad = vx.Radius * (1 - life)
-			local ang = base + life * TAU * (vx.Twist or 3)
-			local y = vx.Height * life
-			local wp = footPos + Vector3new(mathcos(ang) * rad, y, mathsin(ang) * rad)
-			local col = vx.Rainbow and Color3fromHSV((life + clock * 0.2) % 1, 1, 1) or vx.Color
-			self:DrawWorldDot(id .. "_vortex_" .. i, wp, vx.Size * (1 - life * 0.5), col, mathclamp(life * 2, 0, 1))
-		end
-	end
-
-	if e.Shockwave and e.Shockwave.Enabled then
-		local sw = e.Shockwave
-		for w = 1, sw.Waves do
-			local frac = ((clock * sw.Speed * 0.1) + (w / sw.Waves)) % 1
-			local radius = mathmax(sw.Radius * frac, 0.1)
-			self:DrawWorldRing(id .. "_shock_" .. w, footPos, radius, sw.Segments or 40, sw.Color, sw.Thickness or 2, sw.Alpha * (1 - frac), 0, { glow = true, glowAlpha = sw.Alpha * (1 - frac) * 0.5 })
-		end
-	end
-
-	if e.Aura and e.Aura.Enabled then
-		local au = e.Aura
-		for i = 1, au.Rings do
-			local ang = clock * au.Speed * (i % 2 == 0 and 1 or -1)
-			local tilt = (i / au.Rings) * math.pi
-			local prev
-			local segs = au.Segments or 36
-			for s = 0, segs do
-				local a = (s / segs) * TAU
-				local local3 = Vector3new(mathcos(a) * au.Radius, mathsin(a) * au.Radius * mathsin(tilt), mathsin(a) * au.Radius * mathcos(tilt))
-				local rotated = Vector3new(local3.X * mathcos(ang) - local3.Z * mathsin(ang), local3.Y, local3.X * mathsin(ang) + local3.Z * mathcos(ang))
-				local sp, depth = self:W2S(centerPos + rotated)
-				local cur = { x = sp.X, y = sp.Y, d = depth }
-				if prev and prev.d > 0 and depth > 0 then
-					local line = self:GetDrawing(id .. "_aura_" .. i .. "_" .. s, "Line")
-					line.Visible = true
-					line.From = Vector2new(prev.x, prev.y)
-					line.To = Vector2new(cur.x, cur.y)
-					line.Color = au.Rainbow and Color3fromHSV((i / au.Rings + clock * 0.15) % 1, 1, 1) or au.Color
-					line.Thickness = au.Thickness or 1
-					line.Transparency = au.Alpha or 0.7
-				end
-				prev = cur
-			end
-		end
-	end
-
-	if e.Fireflies and e.Fireflies.Enabled then
-		local ff = e.Fireflies
-		for i = 1, ff.Count do
-			local t = clock * ff.Speed * 0.1
-			local ax = mathsin(t + rnd(i) * TAU) * ff.Radius
-			local az = mathcos(t * 1.3 + rnd(i * 2.1) * TAU) * ff.Radius
-			local ay = ff.Height * (0.3 + 0.7 * (0.5 + 0.5 * mathsin(t * 2 + i)))
-			local flick = 0.4 + 0.6 * (0.5 + 0.5 * mathsin(clock * 8 + i * 1.7))
-			local col = ff.Rainbow and Color3fromHSV((rnd(i) + clock * 0.1) % 1, 0.7, 1) or ff.Color
-			self:DrawWorldDot(id .. "_ff_" .. i, footPos + Vector3new(ax, ay, az), ff.Size * flick, col, flick)
-		end
-	end
-
-	if e.Lightning and e.Lightning.Enabled then
-		local lt = e.Lightning
-		local bolts = lt.Bolts or 3
-		for b = 1, bolts do
-			local phase = mathfloor(clock * lt.Speed + b) 
-			local seedBase = phase * 13.1 + b * 7.3
-			local ang = rnd(seedBase) * TAU
-			local segs = lt.Segments or 6
-			local topY = lt.Height
-			local prev = footPos + Vector3new(mathcos(ang) * lt.Radius, topY, mathsin(ang) * lt.Radius)
-			local flash = 1 - (clock * lt.Speed % 1)
-			for s = 1, segs do
-				local frac = s / segs
-				local jitter = (rnd(seedBase + s) - 0.5) * lt.Jitter
-				local jz = (rnd(seedBase + s * 2.3) - 0.5) * lt.Jitter
-				local cur = footPos + Vector3new(mathcos(ang) * lt.Radius * (1 - frac) + jitter, topY * (1 - frac), mathsin(ang) * lt.Radius * (1 - frac) + jz)
-				local p1, d1 = self:W2S(prev)
-				local p2, d2 = self:W2S(cur)
-				local line = self:GetDrawing(id .. "_lt_" .. b .. "_" .. s, "Line")
-				if d1 > 0 and d2 > 0 then
-					line.Visible = true
-					line.From = p1
-					line.To = p2
-					line.Color = lt.Color
-					line.Thickness = lt.Thickness or 2
-					line.Transparency = mathclamp(flash * (lt.Alpha or 1), 0, 1)
-				else
-					line.Visible = false
-				end
-				prev = cur
-			end
-		end
-	end
-
-	if e.Helix and e.Helix.Enabled then
-		local hx = e.Helix
-		local pts = hx.Points or 40
-		local strands = hx.Strands or 2
-		for st = 0, strands - 1 do
-			local offset = (st / strands) * TAU
-			local prev
-			for i = 0, pts do
-				local frac = i / pts
-				local ang = frac * TAU * (hx.Turns or 2) + clock * hx.Speed + offset
-				local y = hx.Height * frac
-				local wp = centerPos + Vector3new(mathcos(ang) * hx.Radius, y - hx.Height / 2, mathsin(ang) * hx.Radius)
-				local sp, depth = self:W2S(wp)
-				local cur = { x = sp.X, y = sp.Y, d = depth }
-				if prev and prev.d > 0 and depth > 0 then
-					local line = self:GetDrawing(id .. "_hx_" .. st .. "_" .. i, "Line")
-					line.Visible = true
-					line.From = Vector2new(prev.x, prev.y)
-					line.To = Vector2new(cur.x, cur.y)
-					line.Color = hx.Rainbow and Color3fromHSV((frac + clock * 0.2) % 1, 1, 1) or hx.Color
-					line.Thickness = hx.Thickness or 1
-					line.Transparency = hx.Alpha or 0.8
-				end
-				prev = cur
-			end
-		end
-	end
-
-	if e.Heartbeat and e.Heartbeat.Enabled then
-		local hb = e.Heartbeat
-		local beat = (clock * hb.Speed) % 1
-		local pulse = beat < 0.15 and (beat / 0.15) or mathmax(0, 1 - (beat - 0.15) / 0.85)
-		local radius = hb.Radius * (0.6 + 0.4 * pulse)
-		self:DrawWorldRing(id .. "_hb", footPos, radius, hb.Segments or 40, hb.Color, hb.Thickness or 2, (hb.Alpha or 0.8) * (0.4 + 0.6 * pulse), 0, { glow = true, glowAlpha = 0.3 * pulse })
-	end
-
-	if e.Grid and e.Grid.Enabled then
-		local gr = e.Grid
-		local n = gr.Lines or 6
-		local size = gr.Size or 10
-		local step = (size * 2) / n
-		for i = 0, n do
-			local off = -size + i * step
-			local phase = mathsin(clock * gr.Speed + i) * gr.Wave
-			local a1 = footPos + Vector3new(off, phase, -size)
-			local a2 = footPos + Vector3new(off, phase, size)
-			local b1 = footPos + Vector3new(-size, phase, off)
-			local b2 = footPos + Vector3new(size, phase, off)
-			local pa1, da1 = self:W2S(a1)
-			local pa2, da2 = self:W2S(a2)
-			local pb1, db1 = self:W2S(b1)
-			local pb2, db2 = self:W2S(b2)
-			local l1 = self:GetDrawing(id .. "_gridA_" .. i, "Line")
-			if da1 > 0 and da2 > 0 then
-				l1.Visible = true l1.From = pa1 l1.To = pa2
-				l1.Color = gr.Color l1.Thickness = 1 l1.Transparency = gr.Alpha or 0.5
-			else l1.Visible = false end
-			local l2 = self:GetDrawing(id .. "_gridB_" .. i, "Line")
-			if db1 > 0 and db2 > 0 then
-				l2.Visible = true l2.From = pb1 l2.To = pb2
-				l2.Color = gr.Color l2.Thickness = 1 l2.Transparency = gr.Alpha or 0.5
-			else l2.Visible = false end
-		end
-	end
-
-	if e.Tornado and e.Tornado.Enabled then
-		local tn = e.Tornado
-		for i = 1, tn.Particles do
-			local seed = rnd(i)
-			local life = (clock * tn.Speed * 0.1 + seed) % 1
-			local h = tn.Height * life
-			local rad = tn.Radius * (0.2 + 0.8 * (1 - life))
-			local ang = seed * TAU + clock * tn.Spin + life * TAU * tn.Twist
-			local wp = footPos + Vector3new(mathcos(ang) * rad, h, mathsin(ang) * rad)
-			local col = tn.Rainbow and Color3fromHSV((life + clock * 0.15) % 1, 0.8, 1) or tn.Color
-			self:DrawWorldDot(id .. "_tor_" .. i, wp, tn.Size * (0.5 + life * 0.5), col, mathclamp((1 - life) * 2, 0, 1))
-		end
-	end
-
-	if e.Portal and e.Portal.Enabled then
-		local po = e.Portal
-		for r = 1, po.Rings do
-			local frac = r / po.Rings
-			local wobble = mathsin(clock * po.Speed + r) * 0.3
-			local radius = po.Radius * frac + wobble
-			local hue = (po.Hue + frac * 0.3 + clock * 0.1) % 1
-			self:DrawWorldRing(id .. "_portal_" .. r, footPos + Vector3new(0, po.Height, 0), radius, po.Segments or 40, Color3fromHSV(hue, 1, 1), po.Thickness or 2, po.Alpha, clock * po.Spin * (r % 2 == 0 and 1 or -1), { glow = true, glowAlpha = po.Alpha * 0.4 })
-		end
-	end
-
-	if e.Snow and e.Snow.Enabled then
-		local sn = e.Snow
-		for i = 1, sn.Count do
-			local seed = rnd(i)
-			local ang = seed * TAU
-			local rad = sn.Radius * rnd(i * 1.7)
-			local phase = (clock * sn.Speed * 0.1 + seed) % 1
-			local y = sn.Height * (1 - phase)
-			local sway = mathsin(clock * 2 + i) * 0.8
-			local wp = footPos + Vector3new(mathcos(ang) * rad + sway, y, mathsin(ang) * rad)
-			self:DrawWorldDot(id .. "_snow_" .. i, wp, sn.Size, sn.Color, sn.Alpha or 0.9)
-		end
-	end
-
-	if e.Embers and e.Embers.Enabled then
-		local em = e.Embers
-		for i = 1, em.Count do
-			local seed = rnd(i)
-			local ang = seed * TAU
-			local rad = em.Radius * rnd(i * 2.3) * (0.5 + 0.5 * mathsin(clock + i))
-			local phase = (clock * em.Speed * 0.1 + seed) % 1
-			local y = em.Height * phase
-			local wp = footPos + Vector3new(mathcos(ang) * rad, y, mathsin(ang) * rad)
-			local heat = 1 - phase
-			local col = Color3fromRGB(255, mathfloor(120 + 100 * heat), mathfloor(40 * heat))
-			self:DrawWorldDot(id .. "_ember_" .. i, wp, em.Size * heat, col, mathclamp(heat * 1.5, 0, 1))
-		end
-	end
-
-	if e.Radar and e.Radar.Enabled then
-		local ra = e.Radar
-		local sweep = clock * ra.Speed
-		self:DrawWorldRing(id .. "_radarbase", footPos, ra.Radius, ra.Segments or 40, ra.Color, 1, ra.Alpha * 0.4, 0, EMPTY)
-		self:DrawRadarSweep(id .. "_radarsw", footPos, ra.Radius, sweep, ra.ArcLen or 1.2, ra.Segments or 20, ra.Color, ra.Thickness or 2, ra.Alpha)
-	end
-
-	if e.StarBurst and e.StarBurst.Enabled then
-		local sb = e.StarBurst
-		self:DrawWorldStar(id .. "_starburst", centerPos, sb.OuterRadius, sb.InnerRadius, sb.Points or 5, sb.Rainbow and Color3fromHSV((clock * 0.2) % 1, 1, 1) or sb.Color, sb.Thickness or 2, sb.Alpha or 0.9, clock * sb.Spin)
-	end
+	for i = n + 1, self.rosterN do roster[i] = nil end
+	self.rosterN = n
+	if n > 1 then sort(roster, function(a, b) return a.dist < b.dist end) end
+	return n
 end
 
-function EasyESP:RenderPreview(rainbow)
-	local sk = self.Settings.Visuals
-	local p = sk.Preview
-	local clock = self.State.Clock
-	local id = "__preview__"
-
-	local viewport = Camera.ViewportSize
-	local bw, bh = p.Width, p.Height
-	local bx = p.X
-	local by = (p.Y ~= 0) and p.Y or (viewport.Y * 0.5 - bh * 0.5)
-	local centerX = bx + bw / 2
-
-	local plr = LocalPlayer
-	local char = plr and plr.Character
-	local hum = char and char:FindFirstChildOfClass("Humanoid")
-
-	local health = p.FakeHealth
-	local maxHealth = 100
-	local name = plr and plr.DisplayName or "Preview"
-	if hum and health < 0 then
-		health = hum.Health
-		maxHealth = hum.MaxHealth
-	elseif health < 0 then
-		health = 100
-	end
-	local pct = maxHealth > 0 and (health / maxHealth) or 1
-
-	local accent = sk.Rainbow and rainbow or sk.Box.Color
-	if sk.LowHealthPulse.Enabled and pct <= sk.LowHealthPulse.Threshold then
-		accent = accent:Lerp(sk.LowHealthPulse.Color, 0.5 + 0.5 * mathsin(clock * sk.LowHealthPulse.Speed))
+function ESP:tick(dt)
+	local cfg = self.cfg
+	if not cfg.enabled then
+		self.pool:openFrame()
+		self.pool:closeFrame()
+		for _, h in pairs(self.hl) do h.Enabled = false end
+		for uid in pairs(self.mat) do self:dropMatCham(uid) end
+		if self.worldApplied then self:restoreWorld() end
+		return
 	end
 
-	if sk.Glow.Enabled then
-		self:VisualsGlow(id, bx, by, bw, bh, sk.Glow, sk.Rainbow and rainbow or sk.Glow.Color, clock)
-	end
-	if sk.Box.Enabled then
-		self:VisualsBox(id, bx, by, bw, bh, sk.Box, sk.Rainbow and rainbow or accent)
-	end
-	if sk.HealthBar.Enabled then
-		self:VisualsHealthBar(id, bx, by, bw, bh, pct, sk.HealthBar)
-	end
-	if sk.ArmorBar.Enabled then
-		self:VisualsArmorBar(id, bx, by, bw, bh, 0.7, sk.ArmorBar)
-	end
+	self.clock = self.clock + dt
+	self.frame = self.frame + 1
+	if cfg.perf.frameSkip > 0 and self.frame % (cfg.perf.frameSkip + 1) ~= 0 then return end
+	if os.clock() - self.lastTick < cfg.refresh then return end
+	self.lastTick = os.clock()
 
-	local topY = by - 4
-	if sk.Name.Enabled then
-		topY = topY - sk.Name.Size
-		if sk.Name.Shadow then
-			self:DrawText(id .. "_nmsh", name, Vector2new(centerX + 1, topY + 1), sk.Name.Size, Color3new(0, 0, 0), true, sk.Name.Font, false)
-		end
-		self:DrawText(id .. "_nm", name, Vector2new(centerX, topY), sk.Name.Size, sk.Name.Color, true, sk.Name.Font, sk.Name.Outline)
-	end
+	self.pool:openFrame()
+	self:driveWorld()
+	self:drawSelfRings()
+	self:drawSelfTrail()
+	self:drawFov()
+	self:drawCross()
+	self:drawPreview()
+	self:drawEntities()
 
-	local botY = by + bh + 3
-	if sk.Weapon.Enabled then
-		local wep = plr and self.GetTool(plr) or "None"
-		if wep == "None" then wep = "Weapon" end
-		self:DrawText(id .. "_wep", wep, Vector2new(centerX, botY), sk.Weapon.Size, sk.Weapon.Color, true, sk.Weapon.Font, sk.Weapon.Outline)
-		botY = botY + sk.Weapon.Size
-	end
-	if sk.Distance.Enabled then
-		self:DrawText(id .. "_dist", "0" .. sk.Distance.Suffix, Vector2new(centerX, botY), sk.Distance.Size, sk.Distance.Color, true, sk.Distance.Font, sk.Distance.Outline)
-	end
+	local perf = cfg.perf
+	local n = self:collectRoster()
+	local cap = perf.playerCap
+	if perf.mode == "auto" and cap == 0 and n > 24 then cap = 24 end
+	local shown = 0
 
-	if sk.Flags.Enabled then
-		local ctx = {
-			player = plr, character = char, root = char and char:FindFirstChild("HumanoidRootPart"),
-			humanoid = hum, distance = 0, visible = true, esp = self,
-		}
-		self:VisualsFlags(id, bx, by, bw, bh, ctx, sk.Flags)
-	end
+	for i = 1, n do
+		local slot = self.roster[i]
+		local plr, rig, root, hum, dist = slot.plr, slot.rig, slot.root, slot.hum, slot.dist
+		local head = rig:FindFirstChild("Head")
 
-	local lbl = self:GetDrawing(id .. "_label", "Text")
-	lbl.Visible = true
-	lbl.Text = "PREVIEW"
-	lbl.Position = Vector2new(centerX, by + bh + 3 + sk.Distance.Size + 4)
-	lbl.Size = 11
-	lbl.Center = true
-	lbl.Color = Color3fromRGB(120, 120, 130)
-	lbl.Outline = true
-	lbl.OutlineColor = Color3new(0, 0, 0)
-end
+		if cfg.hit.on then self:trackHealth(plr, hum) end
+		if cfg.trail.on then self:recordGhost(plr, rig) end
 
-function EasyESP:RenderVisualsPlayer(id, plr, char, root, hum, head, boxPos, boxSize, dist, visible, rainbow)
-	local sk = self.Settings.Visuals
-	local clock = self.State.Clock
-	local bx, by = boxPos.X, boxPos.Y
-	local bw, bh = boxSize.X, boxSize.Y
-	local centerX = bx + bw / 2
+		local visible
+		local needSight = cfg.wallCheck or cfg.wallHide or cfg.wallColors or (cfg.chams.on and cfg.chams.wallColors)
+		if needSight then visible = self:sees(root, rig) end
 
-	local accent = sk.Rainbow and rainbow or sk.Box.Color
-	if sk.LowHealthPulse.Enabled and hum.MaxHealth > 0 then
-		local pct = hum.Health / hum.MaxHealth
-		if pct <= sk.LowHealthPulse.Threshold then
-			local p = 0.5 + 0.5 * mathsin(clock * sk.LowHealthPulse.Speed)
-			accent = accent:Lerp(sk.LowHealthPulse.Color, p)
-		end
-	end
-
-	local hm = self.State.HitMarkers[id]
-	local hitFlash = 0
-	if hm and (clock - hm.t) < sk.HitMarker.Duration then
-		hitFlash = 1 - (clock - hm.t) / sk.HitMarker.Duration
-	end
-	if sk.HitMarker.Enabled and hitFlash > 0 then
-		accent = accent:Lerp(sk.HitMarker.FlashColor, hitFlash)
-	end
-
-	if sk.Glow.Enabled then
-		self:VisualsGlow(id, bx, by, bw, bh, sk.Glow, sk.Rainbow and rainbow or sk.Glow.Color, clock)
-	end
-
-	if sk.Backtrack.Enabled then
-		self:RenderBacktrack(id, plr)
-	end
-
-	if sk.Box.Enabled then
-		local boxColor = sk.Rainbow and rainbow or accent
-		self:VisualsBox(id, bx, by, bw, bh, sk.Box, boxColor)
-	end
-
-	if sk.HealthBar.Enabled and hum.MaxHealth > 0 then
-		self:VisualsHealthBar(id, bx, by, bw, bh, hum.Health / hum.MaxHealth, sk.HealthBar)
-	end
-
-	if sk.ArmorBar.Enabled then
-		local armor = plr:GetAttribute(sk.ArmorBar.Attribute)
-		local maxArmor = plr:GetAttribute(sk.ArmorBar.MaxAttribute) or 100
-		if armor then
-			self:VisualsArmorBar(id, bx, by, bw, bh, armor / maxArmor, sk.ArmorBar)
-		end
-	end
-
-	local topY = by - 4
-	if sk.Name.Enabled then
-		local nm = sk.Name.ShowUser and ("@" .. plr.Name) or plr.DisplayName
-		topY = topY - sk.Name.Size
-		if sk.Name.Shadow then
-			self:DrawText(id .. "_nmsh", nm, Vector2new(centerX + 1, topY + 1), sk.Name.Size, Color3new(0, 0, 0), true, sk.Name.Font, false)
-		end
-		self:DrawText(id .. "_nm", nm, Vector2new(centerX, topY), sk.Name.Size, sk.Name.Color, true, sk.Name.Font, sk.Name.Outline)
-	end
-
-	local botY = by + bh + 3
-	if sk.Weapon.Enabled then
-		local wep = self.GetTool(plr)
-		if wep and wep ~= "None" then
-			local text = wep
-			if sk.Weapon.ShowAmmo then
-				local ammo = plr:GetAttribute(sk.Weapon.AmmoAttribute)
-				if ammo then text = text .. " [" .. tostring(ammo) .. "]" end
-			end
-			self:DrawText(id .. "_wep", text, Vector2new(centerX, botY), sk.Weapon.Size, sk.Weapon.Color, true, sk.Weapon.Font, sk.Weapon.Outline)
-			botY = botY + sk.Weapon.Size
-		end
-	end
-
-	if sk.Distance.Enabled then
-		self:DrawText(id .. "_dist", mathfloor(dist) .. sk.Distance.Suffix, Vector2new(centerX, botY), sk.Distance.Size, sk.Distance.Color, true, sk.Distance.Font, sk.Distance.Outline)
-		botY = botY + sk.Distance.Size
-	end
-
-	if sk.Flags.Enabled then
-		local ctx = {
-			player = plr, character = char, root = root, humanoid = hum,
-			head = head, distance = dist, visible = visible, esp = self,
-		}
-		self:VisualsFlags(id, bx, by, bw, bh, ctx, sk.Flags)
-	end
-
-	if sk.HitMarker.Enabled and sk.HitMarker.Damage and hitFlash > 0 and hm.dmg and hm.dmg > 0 then
-		local dtext = self:DrawText(id .. "_dmg", "-" .. hm.dmg, Vector2new(centerX + 20, by + bh * 0.3 - (1 - hitFlash) * 15), 13, sk.HitMarker.DamageColor, true, 2, true)
-	else
-		local d = self.State.Drawings[id .. "_dmg"]
-		if d then d.Visible = false end
-	end
-
-	local footPos = root.Position - Vector3new(0, (hum.HipHeight or 2) + 2.5, 0)
-	if sk.Rings.Enabled then
-		self:RenderRings(id, footPos, clock)
-	end
-	if sk.Sphere.Enabled then
-		self:RenderSphere(id, root.Position, clock)
-	end
-	self:RenderEffects(id, footPos, root.Position, clock)
-end
-
-function EasyESP:Start()
-	if self.State.Active then return end
-	self.State.Active = true
-
-	tableinsert(self.State.Connections, Players.PlayerRemoving:Connect(function(plr)
-		local id = tostring(plr.UserId)
-		self.State.HitMarkers[id] = nil
-		self.State.Backtrack[id]  = nil
-		self.State.LastHealth[id] = nil
-		self:RemoveCham(id)
-	end))
-
-	tableinsert(self.State.Connections, RunService.RenderStepped:Connect(function(dt)
-
-		if not self.Settings.Master then
-			self:HideAll()
-			for _, hl in pairs(self.State.Highlights) do
-				hl.Enabled = false
-			end
-			for id in pairs(self.State.MaterialChams) do
-				self:RestoreMaterialCham(id)
-			end
-			if self.State.WorldApplied then
-				self:RestoreWorld()
-			end
-			return
+		if cfg.chams.teamCheck and self:isAlly(plr) then
+			self:killCham(plr.UserId)
+		else
+			self:paintCham(plr, rig, visible)
 		end
 
-		self.State.RainbowVal = (self.State.RainbowVal + dt * self.Settings.ESP.RainbowSpeed * 0.1) % 1
-		self.State.Clock = self.State.Clock + dt
-		local rainbow = Color3fromHSV(self.State.RainbowVal, 1, 1)
-
-		local skRainbow = Color3fromHSV((self.State.Clock * self.Settings.Visuals.RainbowSpeed * 0.1) % 1, 1, 1)
-
-		if os.clock() - self.State.LastUpdate < self.Settings.RefreshRate then
-			return
-		end
-		self.State.LastUpdate = os.clock()
-
-		self:BeginFrame()
-		self:UpdateWorld()
-		self:RenderRangeRings(dt)
-		self:RecordLocalTrail()
-		self:RenderLocalTrail()
-		self:RenderFovCircle()
-		self:RenderCrosshair()
-		if self.Settings.Visuals.Enabled and self.Settings.Visuals.Preview.Enabled then
-			pcall(function() self:RenderPreview(skRainbow) end)
-		end
-
-		for _, plr in ipairs(Players:GetPlayers()) do
-			if plr == LocalPlayer then continue end
-
-			local id = tostring(plr.UserId)
-
-			local espTeam  = self.Settings.ESP.TeamCheck and self:IsTeamMate(plr)
-			local chamTeam = self.Settings.Chams.TeamCheck and self:IsTeamMate(plr)
-
-			local char = plr.Character
-			local root = char and char:FindFirstChild("HumanoidRootPart")
-			local hum  = char and char:FindFirstChildOfClass("Humanoid")
-			local head = char and char:FindFirstChild("Head")
-
-			if not char or not root or not hum or hum.Health <= 0 then
-				local hl = self.State.Highlights[id]
-				if hl then hl.Enabled = false end
-				if self.State.MaterialChams[id] then self:RestoreMaterialCham(id) end
-				continue
-			end
-
-			local s = self.Settings.ESP
-			local sk = self.Settings.Visuals
-
-			if sk.Enabled and sk.HitMarker.Enabled then
-				self:UpdateHitTracking(plr, hum)
-			end
-			if sk.Enabled and sk.Backtrack.Enabled then
-				self:RecordBacktrack(plr, char)
-			end
-
-			local skTeam = sk.Enabled and sk.TeamCheck and self:IsTeamMate(plr)
-
-			local visible
-			local needVisibility = s.VisibleCheck or s.VisibleColor
-				or (sk.Enabled and sk.VisibleCheck)
-				or (self.Settings.Chams.Enabled and self.Settings.Chams.UseVisibleColor)
-			if needVisibility then
-				visible = self:IsVisible(root, char)
-			end
-
-			if chamTeam then
-				local hl = self.State.Highlights[id]
-				if hl then hl.Enabled = false end
-				if self.State.MaterialChams[id] then self:RestoreMaterialCham(id) end
-			else
-				self:UpdateChams(plr, char, visible)
-			end
-
-			if espTeam then continue end
-
-			local screenPos, depth, onScreen = self:W2S(root.Position)
-			local dist = (Camera.CFrame.Position - root.Position).Magnitude
-			if dist > self.Settings.MaxDist then continue end
-
-			local color     = s.Rainbow and rainbow or s.BoxColor
-			local textColor = s.Rainbow and rainbow or s.TextColor
-
-			if s.VisibleCheck and not visible then continue end
-
-			if s.VisibleColor then
-				local vc = visible and s.VisibleColorOn or s.VisibleColorOff
-				color     = vc
-				textColor = vc
-			end
-
+		local skip = (cfg.teamCheck and self:isAlly(plr)) or (cfg.wallHide and visible == false)
+		if not skip and (cap == 0 or shown < cap) then
+			local sx, sy, depth, onScreen = self:project(root.Position)
 			if onScreen and depth > 0 then
-				local boxPos, boxSize, boxValid = self:GetBoundingBox(char)
-				if not boxValid then continue end
-
-				local bx, by = boxPos.X, boxPos.Y
-				local bw, bh = boxSize.X, boxSize.Y
-				if bw < 4 then bw = 4 end
-				if bh < 6 then bh = 6 end
-				local centerX = bx + bw / 2
-
-				if s.Enabled then
-					local style = s.BoxStyle
-
-					if style == "3D" then
-						self:Render3DBox(id, char, color, false)
-					elseif style == "3DCorner" then
-						self:Render3DBox(id, char, color, true)
-					elseif style == "2D" then
-						if s.BoxOutline then
-							self:DrawSquare(id .. "_bo", Vector2new(bx - 1, by - 1), Vector2new(bw + 2, bh + 2), Color3new(0, 0, 0), false, s.BoxThickness + 2, 1)
-						end
-						self:DrawSquare(id .. "_b", Vector2new(bx, by), Vector2new(bw, bh), color, false, s.BoxThickness, 1)
-						if s.BoxFill then
-							self:DrawSquare(id .. "_bf", Vector2new(bx, by), Vector2new(bw, bh), color, true, 1, s.BoxFillAlpha)
-						end
-					elseif style == "Corner" then
-						local cornerLen = mathmin(bw, bh) * 0.25
-						if s.BoxOutline then
-							local co = {
-								{Vector2new(bx - 1, by - 1), Vector2new(bx + cornerLen + 1, by - 1)},
-								{Vector2new(bx - 1, by - 1), Vector2new(bx - 1, by + cornerLen + 1)},
-								{Vector2new(bx + bw + 1, by - 1), Vector2new(bx + bw - cornerLen - 1, by - 1)},
-								{Vector2new(bx + bw + 1, by - 1), Vector2new(bx + bw + 1, by + cornerLen + 1)},
-								{Vector2new(bx - 1, by + bh + 1), Vector2new(bx + cornerLen + 1, by + bh + 1)},
-								{Vector2new(bx - 1, by + bh + 1), Vector2new(bx - 1, by + bh - cornerLen - 1)},
-								{Vector2new(bx + bw + 1, by + bh + 1), Vector2new(bx + bw - cornerLen - 1, by + bh + 1)},
-								{Vector2new(bx + bw + 1, by + bh + 1), Vector2new(bx + bw + 1, by + bh - cornerLen - 1)},
-							}
-							for ci, cp in ipairs(co) do
-								self:DrawLine(id .. "_co_" .. ci, cp[1], cp[2], Color3new(0, 0, 0), s.BoxThickness + 2, 1)
-							end
-						end
-						local ci_ = {
-							{Vector2new(bx, by), Vector2new(bx + cornerLen, by)},
-							{Vector2new(bx, by), Vector2new(bx, by + cornerLen)},
-							{Vector2new(bx + bw, by), Vector2new(bx + bw - cornerLen, by)},
-							{Vector2new(bx + bw, by), Vector2new(bx + bw, by + cornerLen)},
-							{Vector2new(bx, by + bh), Vector2new(bx + cornerLen, by + bh)},
-							{Vector2new(bx, by + bh), Vector2new(bx, by + bh - cornerLen)},
-							{Vector2new(bx + bw, by + bh), Vector2new(bx + bw - cornerLen, by + bh)},
-							{Vector2new(bx + bw, by + bh), Vector2new(bx + bw, by + bh - cornerLen)},
-						}
-						for ci, cp in ipairs(ci_) do
-							self:DrawLine(id .. "_c_" .. ci, cp[1], cp[2], color, s.BoxThickness, 1)
-						end
-						if s.BoxFill then
-							self:DrawSquare(id .. "_bf", Vector2new(bx, by), Vector2new(bw, bh), color, true, 1, s.BoxFillAlpha)
-						end
-					end
-
-					if s.Skeletons then
-						self:RenderSkeleton(id, char, s.Rainbow and rainbow or s.SkeletonColor)
-					end
-
-					if s.HeadDot and head then
-						local hPos, hDepth, hOn = self:W2S(head.Position)
-						if hOn and hDepth > 0 then
-							local dotRadius = mathclamp(s.HeadDotSize, 1, 15)
-							self:DrawCircle(id .. "_hdot", hPos, dotRadius, color, true, 1, 1)
-						end
-					end
-
-					if s.LookLines and head then
-						local headScreen, headDepth, headOn = self:W2S(head.Position)
-						local lookEnd = head.Position + head.CFrame.LookVector * s.LookLen
-						local lookScreen, lookDepth, lookOn = self:W2S(lookEnd)
-						if headOn and lookOn and headDepth > 0 and lookDepth > 0 then
-							self:DrawLine(id .. "_look", headScreen, lookScreen, color, 1, 1)
-						end
-					end
-
-					if s.Tracers then
-						self:RenderTracer(id, Vector2new(centerX, by + bh), s.Rainbow and rainbow or s.TracerColor)
-					end
-
-					if s.HealthBar then
-						local pct = mathclamp(hum.Health / hum.MaxHealth, 0, 1)
-						local barColor = s.HealthBarGradient and Color3fromHSV(pct * 0.3, 1, 1) or Color3new(0, 1, 0)
-						self:DrawBar(id, bx, by, bh, pct, barColor, 0, s.BarThickness, s.BarOutline)
-					end
-
-					local topY = by - 4
-					local fontSize = mathclamp(s.TextSize, 10, 24)
-
-					if s.Names or s.Usernames then
-						local str = ""
-						if s.Names then str = plr.DisplayName end
-						if s.Usernames then
-							if str ~= "" then
-								str = str .. " (@" .. plr.Name .. ")"
-							else
-								str = "@" .. plr.Name
-							end
-						end
-						topY = topY - fontSize
-						self:DrawText(id .. "_n", str, Vector2new(centerX, topY), fontSize, textColor, true, s.TextFont, s.TextOutline)
-					end
-
-					local botY = by + bh + 3
-					if s.Distance then
-						self:DrawText(id .. "_d", mathfloor(dist) .. "m", Vector2new(centerX, botY), fontSize - 2, Color3fromRGB(200, 200, 200), true, s.TextFont, s.TextOutline)
-						botY = botY + (fontSize - 1)
-					end
-
-					if s.Tool then
-						local toolName = self.GetTool(plr)
-						if toolName and toolName ~= "None" then
-							self:DrawText(id .. "_t", toolName, Vector2new(centerX, botY), fontSize - 2, Color3fromRGB(180, 220, 255), true, s.TextFont, s.TextOutline)
-							botY = botY + (fontSize - 1)
-						end
-					end
-
-					for _, cb in pairs(self.State.PlayerCallbacks) do
-						pcall(cb, self, plr, char, Vector2new(bx, by), Vector2new(bw, bh), dist)
-					end
+				local lx, ly, bw, bh = self:screenBox(rig)
+				if lx then
+					if bw < 4 then bw = 4 end
+					if bh < 6 then bh = 6 end
+					shown = shown + 1
+					self:drawPlayer(plr, rig, root, hum, head, lx, ly, bw, bh, dist, visible, self:lodOf(dist))
 				end
-
-				if sk.Enabled and not skTeam and not (sk.VisibleCheck and visible == false) then
-					pcall(function()
-						self:RenderVisualsPlayer(id, plr, char, root, hum, head,
-							Vector2new(bx, by), Vector2new(bw, bh), dist, visible, skRainbow)
-					end)
+			elseif cfg.arrow.on then
+				local vp = cam.ViewportSize
+				if depth < 0 then sx, sy = vp.X - sx, vp.Y - sy end
+				local dx, dy = sx - vp.X / 2, sy - vp.Y / 2
+				local len = sqrt(dx * dx + dy * dy)
+				if len > 0 then
+					dx, dy = dx / len, dy / len
+					local ax, ay = vp.X / 2 + dx * cfg.arrow.radius, vp.Y / 2 + dy * cfg.arrow.radius
+					local rot = atan2(dy, dx)
+					local col = cfg.rainbow and hueAt(self.clock * 0.15) or cfg.arrow.color
+					self.pool:line("ar" .. plr.UserId .. "1", ax, ay, ax - cos(rot + 0.5) * cfg.arrow.size, ay - sin(rot + 0.5) * cfg.arrow.size, col, 2)
+					self.pool:line("ar" .. plr.UserId .. "2", ax, ay, ax - cos(rot - 0.5) * cfg.arrow.size, ay - sin(rot - 0.5) * cfg.arrow.size, col, 2)
 				end
-
-			elseif s.Arrows and s.Enabled then
-				local viewport = Camera.ViewportSize
-				local center = Vector2new(viewport.X / 2, viewport.Y / 2)
-
-				local sx, sy = screenPos.X, screenPos.Y
-				if depth < 0 then
-					sx = viewport.X - sx
-					sy = viewport.Y - sy
-				end
-
-				local dir = (Vector2new(sx, sy) - center)
-				local len = dir.Magnitude
-				if len > 0 then dir = dir / len end
-
-				local arrowPos = center + dir * s.ArrowRadius
-				local rot = mathatan2(dir.Y, dir.X)
-				local tip   = arrowPos
-				local left  = arrowPos - Vector2new(mathcos(rot + 0.5), mathsin(rot + 0.5)) * s.ArrowSize
-				local right = arrowPos - Vector2new(mathcos(rot - 0.5), mathsin(rot - 0.5)) * s.ArrowSize
-
-				self:DrawLine(id .. "_a1", tip, left, color, 2, 1)
-				self:DrawLine(id .. "_a2", tip, right, color, 2, 1)
-				self:DrawLine(id .. "_a3", left, right, color, 2, 1)
 			end
 		end
+	end
 
-		for objId, objData in pairs(self.State.Objects) do
-			if objData.Instance and objData.Instance.Parent and objData.Callback then
-				pcall(objData.Callback, self, objId, objData.Instance)
-			end
-		end
-
-		self:EndFrame()
-	end))
+	self.pool:closeFrame()
 end
 
-function EasyESP:Destroy()
-	self.State.Active = false
+function ESP:start()
+	if self.running then return self end
+	self.running = true
 
-	for _, c in ipairs(self.State.Connections) do
-		pcall(function() c:Disconnect() end)
-	end
-	for _, v in pairs(self.State.Drawings) do
-		pcall(function() v:Remove() end)
-	end
-	for _, hl in pairs(self.State.Highlights) do
-		pcall(function() hl:Destroy() end)
-	end
-	for id in pairs(self.State.MaterialChams) do
-		pcall(function() self:RestoreMaterialCham(id) end)
-	end
+	self.playerLeft = Players.PlayerRemoving:Connect(function(plr)
+		local uid = plr.UserId
+		self.hits[uid], self.btrk[uid], self.hpMem[uid] = nil, nil, nil
+		self:killCham(uid)
+	end)
 
-	self:RestoreWorld()
-
-	self.State.Drawings        = {}
-	self.State.Connections     = {}
-	self.State.Highlights      = {}
-	self.State.MaterialChams   = {}
-	self.State.Objects         = {}
-	self.State.PlayerCallbacks = {}
-	self.State.HitMarkers      = {}
-	self.State.Backtrack       = {}
-	self.State.LastHealth      = {}
-	self.State.RangeRings      = {}
-	self.State.LocalTrail      = {}
-	self.State.Seen            = {}
-	self.State.PrevSeen        = {}
+	self.loop = RunService.RenderStepped:Connect(function(dt)
+		self:tick(dt)
+	end)
+	return self
 end
 
-return EasyESP
+function ESP:destroy()
+	self.running = false
+	if self.loop then self.loop:Disconnect() end
+	if self.playerLeft then self.playerLeft:Disconnect() end
+	self.pool:nuke()
+	for _, h in pairs(self.hl) do pcall(function() h:Destroy() end) end
+	for uid in pairs(self.mat) do self:dropMatCham(uid) end
+	self:restoreWorld()
+	self.hl, self.mat, self.hits, self.hpMem, self.btrk, self.myTrail = {}, {}, {}, {}, {}, {}
+	self.entities, self.selfRings, self.tagHooks = {}, {}, {}
+end
 
-
-
-
-
+return ESP
