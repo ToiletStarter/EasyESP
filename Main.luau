@@ -23,38 +23,32 @@ EasyESP.Defaults = {
         VisibleCheck = false,
 
         Boxes = false,
-        BoxStyle = "2D", -- Options: "2D", "Corner", "3D", "3DCorner"
+        BoxStyle = "2D",
         BoxColor = Color3.fromRGB(255, 255, 255),
         BoxOutline = true,
         BoxFill = false,
         BoxFillAlpha = 0.2,
         BoxThickness = 1,
-        
         Names = false,
         Usernames = false,
         Distance = false,
         Tool = false,
-        
         TextSize = 13,
         TextColor = Color3.fromRGB(255, 255, 255),
         TextOutline = true,
-        
         HealthBar = false,
         HealthBarGradient = true,
         BarThickness = 2,
-        BarOutline = false, -- Changed to false by default
-        
+        BarOutline = false,
         Skeletons = false,
         SkeletonColor = Color3.fromRGB(255, 255, 255),
-        
         HeadDot = false,
         HeadDotSize = 3,
-        
         LookLines = false,
-        LookLen = 10, -- Length in studs
+        LookLen = 10,
 
         Tracers = false,
-        TracerOrigin = "Bottom", -- Options: "Bottom", "Center", "Top", "Mouse"
+        TracerOrigin = "Bottom",
         TracerColor = Color3.fromRGB(255, 255, 255),
 
         Arrows = false,
@@ -62,6 +56,15 @@ EasyESP.Defaults = {
         ArrowSize = 15,
         Rainbow = false,
         RainbowSpeed = 1,
+    },
+    Chams = {
+        Enabled = false,
+        Mode = "Highlight",
+        FillColor = Color3.fromRGB(255, 255, 255),
+        FillAlpha = 0.5,
+        OutlineColor = Color3.fromRGB(255, 255, 255),
+        OutlineAlpha = 0,
+        OnTop = true,
     },
     World = {
         Enabled = false,
@@ -114,8 +117,6 @@ function EasyESP.new()
         RainbowVal = 0
     }
 
-    -- Only keeping GetTool as it's used by default. 
-    -- Users can add GetArmor, GetStamina, etc. via the toolkit themselves.
     self.GetTool = function(plr)
         local char = plr.Character
         local tool = char and char:FindFirstChildOfClass("Tool")
@@ -159,6 +160,7 @@ function EasyESP:IsVisible(part, model)
     return result == nil
 end
 
+-- Get a proper bounding box in screen space from the character model
 function EasyESP:GetBoundingBox(char)
     local cf, size = char:GetBoundingBox()
     local halfSize = size * 0.5
@@ -282,16 +284,16 @@ function EasyESP:RenderTracer(id, target, color)
     line.Thickness = 1
 end
 
-function EasyESP:RenderBar(id, boxX, boxY, boxH, pct, color, offset)
+function EasyESP:RenderHealthBar(id, boxX, boxY, boxH, pct, color)
     local s = self.Settings.ESP
     local barW = s.BarThickness
-    local xPos = boxX - 5 - (offset * (barW + 3))
+    local xPos = boxX - 5 - barW
     local barH = boxH
 
     pct = math.clamp(pct, 0, 1)
 
     if s.BarOutline then
-        local out = self:GetDrawing(id .. "_baro_" .. offset, "Square")
+        local out = self:GetDrawing(id .. "_baro", "Square")
         out.Visible = true
         out.Filled = true
         out.Color = Color3.new(0, 0, 0)
@@ -301,7 +303,7 @@ function EasyESP:RenderBar(id, boxX, boxY, boxH, pct, color, offset)
     end
 
     -- Background
-    local bg = self:GetDrawing(id .. "_barbg_" .. offset, "Square")
+    local bg = self:GetDrawing(id .. "_barbg", "Square")
     bg.Visible = true
     bg.Filled = true
     bg.Color = Color3.new(0.15, 0.15, 0.15)
@@ -311,7 +313,7 @@ function EasyESP:RenderBar(id, boxX, boxY, boxH, pct, color, offset)
 
     -- Fill
     local fillH = barH * pct
-    local main = self:GetDrawing(id .. "_bar_" .. offset, "Square")
+    local main = self:GetDrawing(id .. "_bar", "Square")
     main.Visible = true
     main.Filled = true
     main.Color = color
@@ -529,7 +531,7 @@ function EasyESP:Start()
                     end
 
                     -- ========================
-                    -- LOOK LINES (Fixed Length)
+                    -- LOOK LINES
                     -- ========================
                     if s.LookLines and head then
                         local headScreen, headDepth, headOn = self:W2S(head.Position)
@@ -555,17 +557,16 @@ function EasyESP:Start()
                     end
 
                     -- ========================
-                    -- BARS (Health Only)
+                    -- HEALTH BAR
                     -- ========================
                     if s.HealthBar then
                         local pct = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
                         local barColor = s.HealthBarGradient and Color3.fromHSV(pct * 0.3, 1, 1) or Color3.new(0, 1, 0)
-                        -- Offset 0 since only health bar exists by default
-                        self:RenderBar(id, bx, by, bh, pct, barColor, 0)
+                        self:RenderHealthBar(id, bx, by, bh, pct, barColor)
                     end
 
                     -- ========================
-                    -- TEXT ABOVE (Names)
+                    -- TEXT ABOVE (names)
                     -- ========================
                     local topY = by - 4
                     local fontSize = math.clamp(s.TextSize, 10, 24)
@@ -585,7 +586,7 @@ function EasyESP:Start()
                     end
 
                     -- ========================
-                    -- TEXT BELOW (Distance, Tool)
+                    -- TEXT BELOW (distance, tool)
                     -- ========================
                     local botY = by + bh + 3
 
@@ -601,7 +602,6 @@ function EasyESP:Start()
                             botY = botY + (fontSize - 1)
                         end
                     end
-
                 end
 
             elseif s.Arrows and s.Enabled then
