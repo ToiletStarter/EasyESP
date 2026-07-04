@@ -1,70 +1,90 @@
+-- // EasyESP Professional: Ultra-Feature-Rich Visual Backend
+-- // Version: 3.0.0 (Enterprise Modular Edition)
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
 local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+    Camera = workspace.CurrentCamera
+end)
 
 local EasyESP = {}
 EasyESP.__index = EasyESP
 
+-- // Default Configuration
 EasyESP.Defaults = {
     Master = false,
-    MaxDist = 2000,
-    RefreshRate = 1,
+    MaxDist = 2500,
+
     ESP = {
         Enabled = false,
-        Boxes = true,
-        BoxStyle = "Corner", -- "2D", "Corner", "3D"
-        BoxThick = 1.5,
+        TeamCheck = false,
+        VisibleCheck = false,
+        
+        -- Box Visuals
+        Boxes = false,
+        BoxStyle = "2D", -- "2D", "Corner", "3D", "3DCorner"
+        BoxColor = Color3.fromRGB(255, 255, 255),
         BoxOutline = true,
         BoxFill = false,
         BoxFillAlpha = 0.2,
-        
-        Names = true,
-        Distance = true,
-        HealthBar = true,
-        HealthText = false,
+        BoxThickness = 1,
+
+        -- Text Visuals
+        Names = false, -- Display Name
+        Usernames = false, -- @Username
+        Distance = false,
         Tool = false,
-        
+        TextSize = 13,
+        TextColor = Color3.fromRGB(255, 255, 255),
+        TextOutline = true,
+
+        -- Bars (Multi-Stacking)
+        HealthBar = false,
+        HealthBarGradient = true, -- Lerps Green -> Red
+        ArmorBar = false,
+        ArmorColor = Color3.fromRGB(0, 180, 255),
+        BarThickness = 2,
+        BarOutline = true,
+
+        -- Extra Visuals
         Skeletons = false,
+        SkeletonColor = Color3.fromRGB(255, 255, 255),
+        HeadSkeleton = false, -- Detailed head cage
         HeadDot = false,
         LookLines = false,
-        LookLen = 8,
         
-        Tracers = false,
-        TracerOrigin = "Bottom", -- "Bottom", "Center", "Mouse"
+        -- Inventory/Hotbar Framework
+        Inventory = false,
+        Hotbar = false,
+        InvMaxItems = 5,
         
+        -- Offscreen
         Arrows = false,
-        ArrowRadius = 150,
-        ArrowSize = 12,
-        
-        TeamCheck = false,
-        TeamColor = true,
-        VisibleCheck = false,
-        Color = Color3.fromRGB(255, 255, 255),
-        VisibleColor = Color3.fromRGB(0, 255, 150),
+        ArrowRadius = 180,
     },
+
     Chams = {
         Enabled = false,
-        Mode = "Highlight", -- "Highlight", "Material", "Wireframe"
+        Mode = "Highlight",
         FillColor = Color3.fromRGB(255, 255, 255),
-        OutlineColor = Color3.fromRGB(255, 255, 255),
         FillAlpha = 0.5,
-        OutlineAlpha = 0,
         OnTop = true,
-        Pulse = false,
     },
+
     World = {
         Enabled = false,
-        Brightness = 1,
-        Ambient = Color3.fromRGB(127, 127, 127),
+        Fullbright = false,
         FOV = 70,
         NoFog = false,
-        NoSky = false,
-        NoShadows = false,
     }
 }
 
+-- // Internal Constants
 local BONES = {
     R15 = {
         {"Head","UpperTorso"},{"UpperTorso","LowerTorso"},
@@ -79,183 +99,228 @@ local BONES = {
     }
 }
 
-function EasyESP.new(options)
+local OFFSETS_3D = {
+    Vector3.new(-1, 1, -1), Vector3.new(1, 1, -1), Vector3.new(1, 1, 1), Vector3.new(-1, 1, 1),
+    Vector3.new(-1, -1, -1), Vector3.new(1, -1, -1), Vector3.new(1, -1, 1), Vector3.new(-1, -1, 1)
+}
+local EDGES_3D = {
+    {1,2},{2,3},{3,4},{4,1}, -- Top
+    {5,6},{6,7},{7,8},{8,5}, -- Bottom
+    {1,5},{2,6},{3,7},{4,8}  -- Connectors
+}
+
+-- // Utility
+local function DeepCopy(t)
+    local copy = {}
+    for k, v in pairs(t) do
+        if type(v) == "table" then copy[k] = DeepCopy(v) else copy[k] = v end
+    end
+    return copy
+end
+
+function EasyESP.new()
     local self = setmetatable({}, EasyESP)
-    self.Settings = table.clone(EasyESP.Defaults)
-    if options and options.Settings then
-        for k, v in pairs(options.Settings) do
-            if type(v) == "table" then
-                for k2, v2 in pairs(v) do self.Settings[k][k2] = v2 end
-            else
-                self.Settings[k] = v
-            end
-        end
+    self.Settings = DeepCopy(EasyESP.Defaults)
+    self.State = { Active = false, Drawings = {}, Highlights = {} }
+    
+    -- // CUSTOMIZABLE HOOKS (Override these for specific games)
+    self.GetArmor = function(plr) return 0 end 
+    self.GetMaxArmor = function(plr) return 100 end
+    self.GetInventory = function(plr) return {} end -- Should return table of strings
+    self.GetHotbar = function(plr) return {} end
+    self.GetTool = function(plr) 
+        local char = plr.Character
+        local tool = char and char:FindFirstChildOfClass("Tool")
+        return tool and tool.Name or "None"
     end
 
-    self.State = {
-        Active = false,
-        Entities = {},
-        Drawings = {},
-        Cache = { Parts = {}, Sky = {}, Lighting = {} },
-        Connections = {}
-    }
-    
     return self
 end
 
-function EasyESP:W2S(pos)
-    local cam = workspace.CurrentCamera
-    if not cam then return Vector2.new(), 0, false end
-    local screenPos, onScreen = cam:WorldToViewportPoint(pos)
-    return Vector2.new(screenPos.X, screenPos.Y), screenPos.Z, onScreen
-end
-
-function EasyESP:GetDraw(id, type)
+-- // Drawing Management
+function EasyESP:GetDrawing(id, type)
     if self.State.Drawings[id] then return self.State.Drawings[id] end
     local obj = Drawing.new(type)
     self.State.Drawings[id] = obj
     return obj
 end
 
-function EasyESP:ClearDrawings()
-    for _, v in pairs(self.State.Drawings) do v:Remove() end
-    self.State.Drawings = {}
+function EasyESP:HideAll()
+    for _, v in pairs(self.State.Drawings) do v.Visible = false end
 end
 
-function EasyESP:UpdateWorld()
-    local w = self.Settings.World
-    if not w.Enabled then return end
+-- // Feature Renderers
+function EasyESP:Render3DBox(id, root, color, isCorner)
+    local cf = root.CFrame
+    local size = root.Parent:GetExtentsSize() * 0.6
+    local corners = {}
     
-    Lighting.Brightness = w.Brightness
-    Lighting.Ambient = w.Ambient
-    Lighting.GlobalShadows = not w.NoShadows
-    if w.NoFog then Lighting.FogEnd = 1e6 end
-    workspace.CurrentCamera.FieldOfView = w.FOV
-end
+    for i, offset in ipairs(OFFSETS_3D) do
+        local wp = (cf * CFrame.new(offset * size)).Position
+        local screenPos, z, onScreen = Camera:WorldToViewportPoint(wp)
+        if not onScreen then return end
+        corners[i] = Vector2.new(screenPos.X, screenPos.Y)
+    end
 
-function EasyESP:RenderSkeleton(entity, pfx, color)
-    local model = entity.model
-    local rig = model:FindFirstChild("UpperTorso") and "R15" or "R6"
-    for i, bone in ipairs(BONES[rig]) do
-        local a, b = model:FindFirstChild(bone[1]), model:FindFirstChild(bone[2])
-        if a and b then
-            local posA, zA, visA = self:W2S(a.Position)
-            local posB, zB, visB = self:W2S(b.Position)
-            local line = self:GetDraw(pfx .. "_skel_" .. i, "Line")
-            if visA and visB and zA > 0 and zB > 0 then
-                line.Visible = true
-                line.From = posA
-                line.To = posB
-                line.Color = color
-                line.Thickness = 1
-            else
-                line.Visible = false
-            end
+    for i, edge in ipairs(EDGES_3D) do
+        local line = self:GetDrawing(id .. "_3d_" .. i, "Line")
+        line.Visible = true
+        line.From = corners[edge[1]]
+        line.To = corners[edge[2]]
+        line.Color = color
+        line.Thickness = self.Settings.ESP.BoxThickness
+        
+        if isCorner then
+            -- Shorten the line for 3D corner style
+            local dir = (line.To - line.From)
+            line.To = line.From + (dir * 0.2)
+            
+            local line2 = self:GetDrawing(id .. "_3d_c" .. i, "Line")
+            line2.Visible = true
+            line2.From = corners[edge[2]]
+            line2.To = corners[edge[2]] - (dir * 0.2)
+            line2.Color = color
+            line2.Thickness = self.Settings.ESP.BoxThickness
         end
     end
 end
 
-function EasyESP:RenderEntity(entity)
+function EasyESP:RenderBar(id, x, y, h, pct, color, offsetIdx)
     local s = self.Settings.ESP
-    local root = entity.model:FindFirstChild("HumanoidRootPart")
-    if not root then return end
+    local xPos = x - 6 - (offsetIdx * (s.BarThickness + 2))
     
-    local pos, depth, onScreen = self:W2S(root.Position)
-    local dist = (workspace.CurrentCamera.CFrame.Position - root.Position).Magnitude
-    
-    local pfx = tostring(entity.id)
-    local color = s.Color
-    if s.TeamColor and entity.teamColor then color = entity.teamColor end
+    local back = self:GetDrawing(id .. "_barbg_" .. offsetIdx, "Square")
+    back.Visible = true
+    back.Filled = true
+    back.Color = Color3.new(0,0,0)
+    back.Transparency = 0.5
+    back.Position = Vector2.new(xPos, y)
+    back.Size = Vector2.new(s.BarThickness, h)
 
-    if not onScreen or depth <= 0 or dist > self.Settings.MaxDist then
-        if s.Arrows and depth > 0 then
-            -- Arrow logic here (simplified)
-        end
-        self:ToggleEntityVisuals(pfx, false)
-        return
-    end
-
-    local size = (Vector2.new(2000, 2000) / depth)
-    local x, y = pos.X - (size.X / 2), pos.Y - (size.Y / 2)
-
-    if s.Boxes then
-        local box = self:GetDraw(pfx .. "_box", "Square")
-        box.Visible = true
-        box.Position = Vector2.new(x, y)
-        box.Size = size
-        box.Color = color
-        box.Thickness = s.BoxThick
-        box.Filled = s.BoxFill
-        box.Transparency = 1
-    end
-
-    if s.Names then
-        local txt = self:GetDraw(pfx .. "_name", "Text")
-        txt.Visible = true
-        txt.Text = entity.name
-        txt.Position = Vector2.new(pos.X, y - 15)
-        txt.Color = color
-        txt.Center = true
-        txt.Outline = true
-        txt.Size = 14
-    end
-
-    if s.HealthBar and entity.hum then
-        local health = entity.hum.Health / entity.hum.MaxHealth
-        local bar = self:GetDraw(pfx .. "_hp", "Square")
-        bar.Visible = true
-        bar.Position = Vector2.new(x - 6, y)
-        bar.Size = Vector2.new(2, size.Y * health)
-        bar.Color = Color3.fromRGB(255 * (1 - health), 255 * health, 0)
-        bar.Filled = true
-    end
-
-    if s.Skeletons then
-        self:RenderSkeleton(entity, pfx, color)
-    end
+    local main = self:GetDrawing(id .. "_bar_" .. offsetIdx, "Square")
+    main.Visible = true
+    main.Filled = true
+    main.Color = color
+    main.Position = Vector2.new(xPos, y + (h * (1 - pct)))
+    main.Size = Vector2.new(s.BarThickness, h * pct)
 end
 
-function EasyESP:ToggleEntityVisuals(pfx, state)
-    for id, draw in pairs(self.State.Drawings) do
-        if string.find(id, pfx) then draw.Visible = state end
+function EasyESP:RenderInventory(id, x, y, items, title)
+    if #items == 0 then return 0 end
+    local s = self.Settings.ESP
+    local height = 0
+    
+    local txt = self:GetDrawing(id .. "_inv_" .. title, "Text")
+    txt.Visible = true
+    txt.Size = s.TextSize - 2
+    txt.Color = Color3.new(0.9, 0.9, 0.9)
+    txt.Outline = true
+    
+    local str = title .. ":\n"
+    for i = 1, math.min(#items, s.InvMaxItems) do
+        str = str .. "- " .. items[i] .. "\n"
     end
+    txt.Text = str
+    txt.Position = Vector2.new(x, y)
+    
+    return txt.TextBounds.Y
 end
 
+-- // Main Loop
 function EasyESP:Start()
-    if self.State.Active then return end
     self.State.Active = true
-    
-    table.insert(self.State.Connections, RunService.RenderStepped:Connect(function()
-        if not self.Settings.Master then 
-            self:ClearDrawings()
-            return 
-        end
-        
-        self:UpdateWorld()
-        
-        local entities = {}
+    table.insert(self.State.Connections or {}, RunService.RenderStepped:Connect(function()
+        if not self.Settings.Master then self:HideAll() return end
+        self:HideAll()
+
         for _, plr in ipairs(Players:GetPlayers()) do
-            if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Humanoid") then
-                table.insert(entities, {
-                    id = plr.UserId,
-                    name = plr.Name,
-                    model = plr.Character,
-                    hum = plr.Character.Humanoid,
-                    teamColor = plr.TeamColor.Color
-                })
+            if plr == LocalPlayer or not plr.Character then continue end
+            local char = plr.Character
+            local root = char:FindFirstChild("HumanoidRootPart")
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if not root or not hum or hum.Health <= 0 then continue end
+
+            local screenPos, depth, onScreen = Camera:WorldToViewportPoint(root.Position)
+            local dist = (Camera.CFrame.Position - root.Position).Magnitude
+            if dist > self.Settings.MaxDist then continue end
+
+            local color = self.Settings.ESP.BoxColor
+            local id = tostring(plr.UserId)
+
+            if onScreen then
+                local size = (Vector2.new(2000, 2000) / depth)
+                local x, y = screenPos.X - (size.X / 2), screenPos.Y - (size.Y / 2)
+                
+                -- Boxes
+                if self.Settings.ESP.Boxes then
+                    local style = self.Settings.ESP.BoxStyle
+                    if style == "3D" then self:Render3DBox(id, root, color, false)
+                    elseif style == "3DCorner" then self:Render3DBox(id, root, color, true)
+                    else -- 2D Logic
+                        local box = self:GetDrawing(id .. "_2d", "Square")
+                        box.Visible = true
+                        box.Position = Vector2.new(x, y); box.Size = size; box.Color = color
+                    end
+                end
+
+                -- Bars
+                local barIdx = 0
+                if self.Settings.ESP.HealthBar then
+                    local hpPct = hum.Health / hum.MaxHealth
+                    local hpClr = self.Settings.ESP.HealthBarGradient and Color3.fromHSV(hpPct * 0.3, 1, 1) or Color3.new(0,1,0)
+                    self:RenderBar(id, x, y, size.Y, hpPct, hpClr, barIdx)
+                    barIdx = barIdx + 1
+                end
+                if self.Settings.ESP.ArmorBar then
+                    local armPct = self.GetArmor(plr) / self.GetMaxArmor(plr)
+                    self:RenderBar(id, x, y, size.Y, armPct, self.Settings.ESP.ArmorColor, barIdx)
+                end
+
+                -- Text Info Stacking
+                local textY = y - 15
+                if self.Settings.ESP.Names or self.Settings.ESP.Usernames then
+                    local txt = self:GetDrawing(id .. "_name", "Text")
+                    txt.Visible = true
+                    txt.Size = self.Settings.ESP.TextSize; txt.Center = true; txt.Outline = true
+                    local nameStr = ""
+                    if self.Settings.ESP.Names then nameStr = plr.DisplayName end
+                    if self.Settings.ESP.Usernames then nameStr = nameStr .. " (@" .. plr.Name .. ")" end
+                    txt.Text = nameStr; txt.Position = Vector2.new(screenPos.X, textY); txt.Color = self.Settings.ESP.TextColor
+                    textY = textY - 15
+                end
+
+                local bottomY = y + size.Y + 2
+                if self.Settings.ESP.Distance then
+                    local txt = self:GetDrawing(id .. "_dist", "Text")
+                    txt.Visible = true; txt.Center = true; txt.Outline = true; txt.Size = self.Settings.ESP.TextSize - 2
+                    txt.Text = "[" .. math.floor(dist) .. "m]"; txt.Position = Vector2.new(screenPos.X, bottomY)
+                    bottomY = bottomY + 12
+                end
+
+                if self.Settings.ESP.Tool then
+                    local txt = self:GetDrawing(id .. "_tool", "Text")
+                    txt.Visible = true; txt.Center = true; txt.Outline = true; txt.Size = self.Settings.ESP.TextSize - 2
+                    txt.Text = self.GetTool(plr); txt.Position = Vector2.new(screenPos.X, bottomY)
+                    bottomY = bottomY + 12
+                end
+
+                -- Inventory/Hotbar
+                local sideX = x + size.X + 5
+                local sideY = y
+                if self.Settings.ESP.Hotbar then
+                    sideY = sideY + self:RenderInventory(id, sideX, sideY, self.GetHotbar(plr), "Hotbar")
+                end
+                if self.Settings.ESP.Inventory then
+                    self:RenderInventory(id, sideX, sideY, self.GetInventory(plr), "Inventory")
+                end
             end
-        end
-        
-        for _, ent in ipairs(entities) do
-            self:RenderEntity(ent)
         end
     end))
 end
 
 function EasyESP:Destroy()
-    self.State.Active = false
-    for _, c in ipairs(self.State.Connections) do c:Disconnect() end
-    self:ClearDrawings()
+    for _, c in ipairs(self.State.Connections or {}) do c:Disconnect() end
+    for _, v in pairs(self.State.Drawings) do v:Remove() end
 end
 
 return EasyESP
