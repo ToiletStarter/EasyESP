@@ -231,9 +231,9 @@ local function baseConfig()
 			distanceFade = false, fadeStart = 150, fadeEnd = 600,
 		},
 		glow = { on = false, color = p.accent, layers = 4, spread = 2, alpha = 0.10, pulse = true, rate = 3 },
-		name = { on = true, size = 13, color = p.text, font = FONTS.Plex, shadow = true, showUser = false },
+		name = { on = true, user = false, size = 13, color = p.text, font = FONTS.Plex, shadow = true },
 		gun  = { on = false, size = 12, color = rgb(205, 205, 215), ammoAttr = "Ammo" },
-		dist = { on = false, size = 11, color = rgb(180, 180, 190), suffix = "m" },
+		dist = { on = false, size = 11, color = rgb(180, 180, 190), suffix = "m", outline = false },
 
 		hp = {
 			on = true, side = "left", thickness = 3, outline = true,
@@ -928,7 +928,6 @@ function ESP:addFlag(name, fn) self.flagProviders[name] = fn end
 function ESP:removeFlag(name) self.flagProviders[name] = nil end
 
 function ESP:installFlags()
-	local white  = rgb(220, 220, 230)
 	local green  = rgb(90, 235, 130)
 	local red    = rgb(235, 80, 80)
 	local blue   = rgb(120, 170, 255)
@@ -945,7 +944,6 @@ function ESP:installFlags()
 		end
 	end)
 	self:addFlag("hp", function(t) return t.hum and { floor(t.hum.Health) .. "hp", green } or nil end)
-	self:addFlag("distance", function(t) return { floor(t.dist) .. "m", white } end)
 	self:addFlag("gun", function(t)
 		local g = self.gunOf(t.plr)
 		return g and { g, gold } or nil
@@ -1165,9 +1163,16 @@ function ESP:drawPlayer(plr, rig, root, hum, head, lx, ly, bw, bh, dist, visible
 	end
 
 	local topY = ly - 4
-	if cfg.name.on then
+	if cfg.name.on or cfg.name.user then
 		local n = cfg.name
-		local label = n.showUser and ("@" .. plr.Name) or plr.DisplayName
+		local label
+		if n.on and n.user then
+			label = plr.DisplayName .. " (" .. plr.Name .. ")"
+		elseif n.user then
+			label = plr.Name
+		else
+			label = plr.DisplayName
+		end
 		topY = topY - n.size
 		if n.shadow then self.pool:text(key .. "nsh", label, mid + 1, topY + 1, n.size, BLACK, true, n.font, false) end
 		self.pool:text(key .. "n", label, mid, topY, n.size, cfg.wallColors and accent or n.color, true, n.font, true)
@@ -1184,7 +1189,7 @@ function ESP:drawPlayer(plr, rig, root, hum, head, lx, ly, bw, bh, dist, visible
 		end
 	end
 	if cfg.dist.on then
-		self.pool:text(key .. "d", floor(dist) .. cfg.dist.suffix, mid, below, cfg.dist.size, cfg.dist.color, true, FONTS.Plex, true)
+		self.pool:text(key .. "d", floor(dist) .. cfg.dist.suffix, mid, below, cfg.dist.size, cfg.dist.color, true, FONTS.Plex, cfg.dist.outline)
 	end
 
 	if cfg.flags.on and not labelsOnly then
