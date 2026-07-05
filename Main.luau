@@ -43,6 +43,7 @@ local TAU = pi * 2
 
 local FONTS = Drawing.Fonts
 local BLACK = rawc(0, 0, 0)
+local WHITE = rawc(1, 1, 1)
 
 local function hueAt(t)
 	return hsv(t % 1, 1, 1)
@@ -71,7 +72,14 @@ local EDGES = {
 }
 
 local function sameColor(a, b)
-	return a == b or (a.R == b.R and a.G == b.G and a.B == b.B)
+	if a == b then return true end
+	if not a or not b then return false end
+	if typeof(a) ~= "Color3" or typeof(b) ~= "Color3" then return false end
+	return a.R == b.R and a.G == b.G and a.B == b.B
+end
+
+local function asColor(color, fallback)
+	return typeof(color) == "Color3" and color or fallback or WHITE
 end
 
 local function jitter(seed)
@@ -193,6 +201,7 @@ end
 
 function Pool:line(key, ax, ay, bx, by, color, thick, alpha, z)
 	local d, sh = self:grab(key, "Line")
+	color = asColor(color, WHITE)
 
 	if not sh.vis then
 		sp(d, "Visible", true); sh.vis = true
@@ -222,6 +231,7 @@ end
 
 function Pool:rect(key, x, y, w, h, color, filled, thick, alpha, z)
 	local d, sh = self:grab(key, "Square")
+	color = asColor(color, WHITE)
 
 	if not sh.vis then
 		sp(d, "Visible", true); sh.vis = true
@@ -255,6 +265,7 @@ end
 
 function Pool:dot(key, x, y, radius, color, filled, alpha, sides, z, thick)
 	local d, sh = self:grab(key, "Circle")
+	color = asColor(color, WHITE)
 
 	if not sh.vis then
 		sp(d, "Visible", true); sh.vis = true
@@ -291,6 +302,7 @@ end
 
 function Pool:tri(key, ax, ay, bx, by, cx, cy, color, alpha, z)
 	local d, sh = self:grab(key, "Triangle")
+	color = asColor(color, WHITE)
 
 	if not sh.vis then
 		sp(d, "Visible", true); sh.vis = true
@@ -322,6 +334,7 @@ end
 
 function Pool:quad(key, ax, ay, bx, by, cx, cy, dx, dy, color, filled, thick, alpha, z)
 	local d, sh = self:grab(key, "Quad")
+	color = asColor(color, WHITE)
 
 	if not sh.vis then
 		sp(d, "Visible", true); sh.vis = true
@@ -361,6 +374,7 @@ end
 
 function Pool:text(key, str, x, y, size, color, centered, font, outlined, z)
 	local d, sh = self:grab(key, "Text")
+	color = asColor(color, WHITE)
 
 	if not sh.vis then
 		sp(d, "Visible", true); sh.vis = true
@@ -711,7 +725,7 @@ local RING_SPEC_DEFAULTS = {
 
 local ESP = {}
 ESP.__index = ESP
-ESP.version = "3.2.0"
+ESP.version = "3.2.1"
 
 function ESP.new(overrides)
 	local self = setmetatable({}, ESP)
@@ -1644,26 +1658,26 @@ function ESP:drawPlayer(plr, rig, root, hum, head, lx, ly, bw, bh, dist, visible
 	local mid = lx + bw / 2
 
 	local box    = cfg.box
-	local accent = cfg.rainbow and hueAt(self.clock * cfg.rainbowRate * 0.1) or box.color
+	local accent = cfg.rainbow and hueAt(self.clock * cfg.rainbowRate * 0.1) or asColor(box.color, cfg.friendColor)
 
 	if cfg.friendHighlight and self.friends[plr.UserId] then
-		accent = cfg.friendColor
+		accent = asColor(cfg.friendColor, accent)
 	end
 
 	if box.colorMode == "team" and plr.Team then
 		accent = plr.TeamColor and plr.TeamColor.Color or accent
 	elseif box.colorMode == "health" and hum.MaxHealth > 0 then
-		accent = box.healthLow:Lerp(box.healthFull, clamp(hum.Health / hum.MaxHealth, 0, 1))
+		accent = asColor(box.healthLow, accent):Lerp(asColor(box.healthFull, accent), clamp(hum.Health / hum.MaxHealth, 0, 1))
 	elseif box.colorMode == "distance" then
-		accent = box.healthFull:Lerp(box.healthLow, clamp(dist / cfg.espRange, 0, 1))
+		accent = asColor(box.healthFull, accent):Lerp(asColor(box.healthLow, accent), clamp(dist / cfg.espRange, 0, 1))
 	end
 
 	if cfg.wallColors and visible ~= nil then
-		accent = visible and cfg.visible or cfg.hidden
+		accent = asColor(visible and cfg.visible or cfg.hidden, accent)
 	end
 
 	if cfg.pulse.on and hum.MaxHealth > 0 and hum.Health / hum.MaxHealth <= cfg.pulse.threshold then
-		accent = accent:Lerp(cfg.pulse.color, 0.5 + 0.5 * sin(self.clock * cfg.pulse.rate))
+		accent = accent:Lerp(asColor(cfg.pulse.color, accent), 0.5 + 0.5 * sin(self.clock * cfg.pulse.rate))
 	end
 
 	local boxFade = 1
@@ -1673,7 +1687,7 @@ function ESP:drawPlayer(plr, rig, root, hum, head, lx, ly, bw, bh, dist, visible
 
 	local hit = self.hits[plr.UserId]
 	if cfg.hit.on and hit and self.clock - hit.at < cfg.hit.life then
-		accent = accent:Lerp(cfg.hit.flash, 1 - (self.clock - hit.at) / cfg.hit.life)
+		accent = accent:Lerp(asColor(cfg.hit.flash, accent), 1 - (self.clock - hit.at) / cfg.hit.life)
 	end
 
 	if cfg.glow.on then
