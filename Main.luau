@@ -522,6 +522,14 @@ local function baseConfig()
 			label = true, health = true, distance = true,
 		},
 
+		list = {
+			on = false, x = 18, y = 360, width = 230, max = 10, rowHeight = 17,
+			background = true, alpha = 0.32, title = true, showAllies = false,
+			health = true, distance = true, visible = true, index = true,
+			color = p.text, enemyColor = p.accent, allyColor = rgb(90, 235, 130),
+			friendColor = p.friend, low = rgb(235, 70, 70), full = rgb(90, 235, 120),
+		},
+
 		hit = {
 			on = false, life = 0.35,
 			flash = rawc(1, 1, 1), showDmg = true,
@@ -723,15 +731,27 @@ local RING_SPEC_DEFAULTS = {
 	pulse = false, fill = false, fillAlpha = 0.08, glow = false, ticks = 0,
 }
 
+local function fillMissing(into, from)
+	for k, v in pairs(from) do
+		if into[k] == nil then
+			into[k] = type(v) == "table" and deepClone(v) or v
+		elseif type(into[k]) == "table" and type(v) == "table" and typeof(v) ~= "Color3" then
+			fillMissing(into[k], v)
+		end
+	end
+	return into
+end
+
 local ESP = {}
 ESP.__index = ESP
-ESP.version = "3.2.1"
+ESP.version = "3.3.0"
 
 function ESP.new(overrides)
 	local self = setmetatable({}, ESP)
 
 	self.cfg = baseConfig()
 	if overrides then merge(self.cfg, overrides) end
+	fillMissing(self.cfg, baseConfig())
 
 	self.pool = Pool.new()
 
@@ -759,6 +779,7 @@ function ESP.new(overrides)
 	self.friends = {}
 
 	self._targetState = {}
+	self._lastTarget = nil
 
 	self.running   = false
 	self.clock     = 0
@@ -2392,6 +2413,65 @@ function ESP:drawTarget(target, cx, cy)
 	end
 end
 
+function ESP:drawList(n, target)
+	local l = self.cfg.list
+	if not l or not l.on then return end
+	local x, y, w = l.x, l.y, l.width
+	local rowH = l.rowHeight or 17
+	local maxRows = l.max or 10
+	local titleH = l.title and 18 or 0
+	local shown = 0
+	local h = titleH + rowH * maxRows + 8
+	if l.background then
+		self.pool:rect("lst_bg", x, y, w, h, BLACK, true, 1, l.alpha or 0.32, 60)
+		self.pool:rect("lst_bd", x, y, w, h, l.enemyColor, false, 1, 0.65, 61)
+	end
+	if l.title then
+		local title = "PLAYERS " .. tostring(n or self.rosterN)
+		if target and target.plr then title = title .. "  TARGET: " .. target.plr.DisplayName end
+		self.pool:text("lst_title", title, x + 6, y + 3, 11, l.color, false, FONTS.Plex, true, 62)
+	end
+	local y0 = y + titleH + 4
+	for i = 1, n or self.rosterN do
+		if shown >= maxRows then break end
+		local slot = self.roster[i]
+		if slot then
+			local plr = slot.plr
+			local ally = self:isAlly(plr)
+			if l.showAllies or not ally then
+				shown = shown + 1
+				local yy = y0 + (shown - 1) * rowH
+				local friend = self.friends[plr.UserId] == true
+				local col = friend and l.friendColor or ally and l.allyColor or (plr.TeamColor and plr.TeamColor.Color or l.enemyColor)
+				local hp = slot.hum and slot.hum.MaxHealth > 0 and clamp(slot.hum.Health / slot.hum.MaxHealth, 0, 1) or 0
+				local hpCol = asColor(l.low, col):Lerp(asColor(l.full, col), hp)
+				if l.background then self.pool:rect("lst_row" .. shown, x + 4, yy, w - 8, rowH - 2, shown % 2 == 0 and rawc(0.08, 0.08, 0.1) or rawc(0.12, 0.12, 0.14), true, 1, 0.42, 61) end
+				self.pool:dot("lst_dot" .. shown, x + 10, yy + rowH * 0.5 - 1, 2.5, col, true, 1, 10, 62)
+				local name = plr.DisplayName
+				if l.index then name = tostring(shown) .. ". " .. name end
+				if friend then name = name .. " [F]" end
+				if l.visible and slot.visible ~= nil then name = name .. (slot.visible and " [V]" or " [H]") end
+				self.pool:text("lst_name" .. shown, name, x + 17, yy + 1, 10, l.color, false, FONTS.Plex, true, 62)
+				if l.distance then self.pool:text("lst_dst" .. shown, floor(slot.dist) .. "m", x + w - 40, yy + 1, 10, col, false, FONTS.Plex, true, 62) end
+				if l.health then
+					self.pool:rect("lst_hbg" .. shown, x + 17, yy + rowH - 4, w - 58, 2, rawc(0.16, 0.16, 0.18), true, 1, 0.9, 62)
+					self.pool:rect("lst_hp" .. shown, x + 17, yy + rowH - 4, (w - 58) * hp, 2, hpCol, true, 1, 1, 63)
+				end
+			end
+		end
+	end
+	shown = shown + 1
+	while self.pool.shadow["lst_name" .. shown] do
+		self.pool:hide("lst_row" .. shown)
+		self.pool:hide("lst_dot" .. shown)
+		self.pool:hide("lst_name" .. shown)
+		self.pool:hide("lst_dst" .. shown)
+		self.pool:hide("lst_hbg" .. shown)
+		self.pool:hide("lst_hp" .. shown)
+		shown = shown + 1
+	end
+end
+
 function ESP:markHit(uid, dmg)
 	self.hits[uid] = { at = self.clock, dmg = dmg }
 end
@@ -2465,6 +2545,7 @@ function ESP:import(source)
 	local ok, loaded = pcall(chunk)
 	if not ok or type(loaded) ~= "table" then return false end
 	merge(self.cfg, loaded)
+	self:repairConfig()
 	return true
 end
 
@@ -2504,12 +2585,12 @@ local PRESETS = {
 	visual = {
 		glow = { on = true }, bones = { on = true }, headDot = { on = true },
 		racer = { on = true }, dist = { on = true }, flags = { on = true },
-		radar = { on = true }, target = { on = true, showFov = true },
+		radar = { on = true }, list = { on = true }, target = { on = true, showFov = true },
 	},
 	minimal = {
 		box = { on = true, style = "corner" }, name = { on = true }, hp = { on = true },
 		glow = { on = false }, bones = { on = false }, tracer = { on = false }, flags = { on = false },
-		radar = { on = false }, target = { on = false },
+		radar = { on = false }, list = { on = false }, target = { on = false },
 	},
 }
 
@@ -2525,6 +2606,37 @@ function ESP:presets()
 	for name in pairs(PRESETS) do out[#out + 1] = name end
 	sort(out)
 	return out
+end
+
+function ESP:repairConfig()
+	return fillMissing(self.cfg, baseConfig())
+end
+
+function ESP:setEnabled(state)
+	self.cfg.enabled = state and true or false
+	return self
+end
+
+function ESP:toggle()
+	self.cfg.enabled = not self.cfg.enabled
+	return self.cfg.enabled
+end
+
+function ESP:setAccent(color)
+	color = asColor(color, self.cfg.friendColor)
+	local cfg = self.cfg
+	cfg.box.color = color
+	cfg.box.fillColor = color
+	cfg.glow.color = color
+	cfg.tracer.color = color
+	cfg.arrow.color = color
+	cfg.radar.enemyColor = color
+	cfg.target.color = color
+	cfg.list.enemyColor = color
+	cfg.self.watermark.accent = color
+	cfg.self.compass.accent = color
+	if cfg.rings.specs[1] then cfg.rings.specs[1].color = color end
+	return color
 end
 
 function ESP:onDraw(name, fn)  self.tagHooks[name] = fn end
@@ -2611,9 +2723,9 @@ function ESP:collectRoster()
 					n = n + 1
 					local slot = roster[n]
 					if slot then
-						slot.plr, slot.rig, slot.root, slot.hum, slot.dist = plr, rig, root, hum, dist
+						slot.plr, slot.rig, slot.root, slot.hum, slot.dist, slot.visible = plr, rig, root, hum, dist, nil
 					else
-						roster[n] = { plr = plr, rig = rig, root = root, hum = hum, dist = dist }
+						roster[n] = { plr = plr, rig = rig, root = root, hum = hum, dist = dist, visible = nil }
 					end
 				end
 			end
@@ -2625,6 +2737,19 @@ function ESP:collectRoster()
 
 	if n > 1 then sort(roster, function(a, b) return a.dist < b.dist end) end
 	return n
+end
+
+function ESP:nearest(maxRange, includeAllies)
+	local best, bestDist
+	local limit = maxRange or huge
+	for i = 1, self.rosterN do
+		local slot = self.roster[i]
+		if slot and slot.dist <= limit and (includeAllies or not self:isAlly(slot.plr)) then
+			best, bestDist = slot.plr, slot.dist
+			break
+		end
+	end
+	return best, bestDist
 end
 
 function ESP:tick(dt)
@@ -2696,6 +2821,7 @@ function ESP:tick(dt)
 		local visible
 		local needSight = cfg.wallCheck or cfg.wallHide or cfg.wallColors or (cfg.chams.on and cfg.chams.wallColors)
 		if needSight then visible = self:sees(rig) end
+		slot.visible = visible
 
 		if cfg.chams.teamCheck and self:isAlly(plr) then
 			self:killCham(plr.UserId)
@@ -2756,7 +2882,9 @@ function ESP:tick(dt)
 		end
 	end
 
+	self._lastTarget = target.plr
 	if wantTarget then self:drawTarget(target, scx, scy) end
+	self:drawList(n, target)
 	self:runModuleScreen()
 	self.pool:closeFrame()
 	if perf.pruneAfter and perf.pruneAfter > 0 and self.frame % max(1, perf.pruneInterval or 120) == 0 then
@@ -2845,6 +2973,7 @@ function ESP:getStats()
 		modules   = #self.moduleOrder,
 		entities  = (function() local n = 0; for _ in pairs(self.entities) do n = n + 1 end; return n end)(),
 		friends   = (function() local n = 0; for _ in pairs(self.friends) do n = n + 1 end; return n end)(),
+		target    = self._lastTarget and self._lastTarget.DisplayName or nil,
 	}
 end
 
