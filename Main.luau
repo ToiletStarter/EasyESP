@@ -28,6 +28,7 @@ local sqrt   = math.sqrt
 local sin    = math.sin
 local cos    = math.cos
 local atan2  = math.atan2
+local tan    = math.tan
 local huge   = math.huge
 local pi     = math.pi
 local max    = math.max
@@ -505,6 +506,11 @@ local function baseConfig()
 		gaze    = { on = false, length = 10, color = p.text },
 		tracer  = { on = false, from = "bottom", color = p.accent, thickness = 1 },
 		arrow   = { on = false, radius = 200, size = 15, color = p.accent, scaleFactor = 1, filled = true, outline = true, distance = false, alpha = 1 },
+		beacon  = { on = false, height = 38, color = p.accent, thickness = 1, alpha = 0.65, pulse = true, label = true },
+		worldLine = { on = false, color = p.accent, thickness = 1, alpha = 0.35, from = "self", to = "feet" },
+		viewCone = { on = false, length = 20, angle = 35, rays = 5, color = p.accent, thickness = 1, alpha = 0.75 },
+		footArrow = { on = false, length = 7, width = 2.6, color = p.accent, alpha = 0.85, filled = true, outline = true },
+		proximity = { on = false, radius = 16, color = p.accent, thickness = 1, alpha = 0.35, pulse = true, sides = 44 },
 
 		radar = {
 			on = false, x = 18, y = 180, radius = 78, range = 500,
@@ -528,6 +534,12 @@ local function baseConfig()
 			health = true, distance = true, visible = true, index = true,
 			color = p.text, enemyColor = p.accent, allyColor = rgb(90, 235, 130),
 			friendColor = p.friend, low = rgb(235, 70, 70), full = rgb(90, 235, 120),
+		},
+
+		threat = {
+			on = false, y = 92, size = 14, color = rgb(255, 80, 90),
+			background = true, alpha = 0.32, visibleOnly = false,
+			showDistance = true, showHealth = true, pulse = true,
 		},
 
 		hit = {
@@ -1883,6 +1895,8 @@ function ESP:drawPlayer(plr, rig, root, hum, head, lx, ly, bw, bh, dist, visible
 			self:drawFx(key, foot, root.Position, lod)
 		end
 
+		self:drawAdvancedPlayer(key, plr, rig, root, hum, head, foot, accent, dist, visible, lod)
+
 		for _, hook in pairs(self.tagHooks) do
 			pcall(hook, self, plr, rig, lx, ly, bw, bh, dist)
 		end
@@ -1900,6 +1914,148 @@ function ESP:drawPlayer(plr, rig, root, hum, head, lx, ly, bw, bh, dist, visible
 			end
 		end
 	end
+end
+
+function ESP:worldSegment(key, a, b, color, thick, alpha, z)
+	local ax, ay, ad = self:project(a)
+	local bx, by, bd = self:project(b)
+	if ad > 0 and bd > 0 then
+		self.pool:line(key, ax, ay, bx, by, color, thick or 1, alpha or 1, z)
+		return true
+	end
+	return false
+end
+
+function ESP:worldText(key, text, pos, color, size, centered, z)
+	local x, y, d = self:project(pos)
+	if d > 0 then
+		self.pool:text(key, text, x, y, size or 11, color, centered ~= false, FONTS.Plex, true, z)
+		return true
+	end
+	return false
+end
+
+function ESP:worldTriangle(key, a, b, c, color, alpha, outline)
+	local ax, ay, ad = self:project(a)
+	local bx, by, bd = self:project(b)
+	local cx, cy, cd = self:project(c)
+	if ad > 0 and bd > 0 and cd > 0 then
+		if outline then
+			self.pool:tri(key .. "o", ax, ay, bx, by, cx, cy, BLACK, alpha or 1)
+		end
+		self.pool:tri(key, ax, ay, bx, by, cx, cy, color, alpha or 1)
+		return true
+	end
+	return false
+end
+
+function ESP:drawViewCone(key, head, opt, color, lod)
+	if not head or not opt.on or lod >= 3 then return end
+	local rays = clamp(floor(opt.rays or 5), 2, 15)
+	local len = opt.length or 20
+	local angle = (opt.angle or 35) * pi / 180
+	local origin = head.Position
+	local look = head.CFrame.LookVector
+	local right = head.CFrame.RightVector
+	local last
+	for i = 0, rays - 1 do
+		local t = rays == 1 and 0 or (i / (rays - 1)) * 2 - 1
+		local dir = (look * cos(angle * t) + right * sin(angle * t)).Unit
+		local endp = origin + dir * len
+		self:worldSegment(key .. "vc" .. i, origin, endp, color, opt.thickness or 1, opt.alpha or 0.75)
+		if last then
+			self:worldSegment(key .. "vce" .. i, last, endp, color, 1, (opt.alpha or 0.75) * 0.45)
+		end
+		last = endp
+	end
+end
+
+function ESP:drawFootArrow(key, root, foot, opt, color)
+	if not root or not foot or not opt.on then return end
+	local look = root.CFrame.LookVector
+	local right = root.CFrame.RightVector
+	local len = opt.length or 7
+	local width = opt.width or 2.5
+	local tip = foot + look * len + v3(0, 0.08, 0)
+	local left = foot - look * len * 0.28 - right * width + v3(0, 0.08, 0)
+	local rgt = foot - look * len * 0.28 + right * width + v3(0, 0.08, 0)
+	if opt.filled then
+		self:worldTriangle(key .. "fa", tip, left, rgt, color, opt.alpha or 0.85, opt.outline)
+	else
+		self:worldSegment(key .. "fa1", tip, left, color, 2, opt.alpha or 0.85)
+		self:worldSegment(key .. "fa2", tip, rgt, color, 2, opt.alpha or 0.85)
+		self:worldSegment(key .. "fa3", left, rgt, color, 1, (opt.alpha or 0.85) * 0.65)
+	end
+end
+
+function ESP:drawBeacon(key, plr, root, foot, opt, color, dist)
+	if not root or not foot or not opt.on then return end
+	local h = opt.height or 38
+	local a = opt.alpha or 0.65
+	if opt.pulse then a = a * (0.62 + 0.38 * abs(sin(self.clock * 3))) end
+	local top = root.Position + v3(0, h, 0)
+	self:worldSegment(key .. "bc", foot, top, color, opt.thickness or 1, a)
+	self:worldSpark(key .. "bcd", top.X, top.Y, top.Z, 4 + 2 * abs(sin(self.clock * 4)), color, a)
+	if opt.label then
+		self:worldText(key .. "bct", plr.DisplayName .. " " .. floor(dist) .. "m", top + v3(0, 1.5, 0), color, 11, true)
+	end
+end
+
+function ESP:drawWorldLink(key, root, foot, opt, color)
+	if not opt.on then return end
+	local myRig = me.Character
+	local myRoot = myRig and myRig:FindFirstChild("HumanoidRootPart")
+	if not myRoot then return end
+	local from = opt.from == "camera" and cam.CFrame.Position or myRoot.Position
+	local to = opt.to == "root" and root.Position or foot
+	self:worldSegment(key .. "wl", from, to, color, opt.thickness or 1, opt.alpha or 0.35)
+end
+
+function ESP:drawProximity(key, foot, opt, color, lod)
+	if not opt.on or lod >= 3 then return end
+	local radius = opt.radius or 16
+	local alpha = opt.alpha or 0.35
+	if opt.pulse then
+		radius = radius * (0.9 + 0.1 * sin(self.clock * 2.5))
+		alpha = alpha * (0.65 + 0.35 * abs(sin(self.clock * 2.5)))
+	end
+	self:worldRing(key .. "pr", foot.X, foot.Y + 0.03, foot.Z, radius, scaleSides(opt.sides or 44, lod), color, opt.thickness or 1, alpha, self.clock * 0.2, { glow = true, glowAlpha = alpha * 0.35 })
+end
+
+function ESP:drawAdvancedPlayer(key, plr, rig, root, hum, head, foot, accent, dist, visible, lod)
+	local cfg = self.cfg
+	local color = accent
+	if cfg.beacon.on then self:drawBeacon(key, plr, root, foot, cfg.beacon, asColor(cfg.beacon.color, color), dist) end
+	if cfg.worldLine.on then self:drawWorldLink(key, root, foot, cfg.worldLine, asColor(cfg.worldLine.color, color)) end
+	if cfg.viewCone.on then self:drawViewCone(key, head, cfg.viewCone, asColor(cfg.viewCone.color, color), lod) end
+	if cfg.footArrow.on then self:drawFootArrow(key, root, foot, cfg.footArrow, asColor(cfg.footArrow.color, color)) end
+	if cfg.proximity.on then self:drawProximity(key, foot, cfg.proximity, asColor(cfg.proximity.color, color), lod) end
+end
+
+function ESP:drawThreat(target)
+	local t = self.cfg.threat
+	if not t or not t.on or not cam then return end
+	local vp = cam.ViewportSize
+	local cx = vp.X * 0.5
+	local y = t.y or 92
+	local size = t.size or 14
+	if not target or not target.plr then
+		return
+	end
+	if t.visibleOnly and target.visible == false then return end
+	local plr = target.plr
+	local hum = target.hum
+	local col = asColor(t.color, self.cfg.target.color)
+	if t.pulse then col = col:Lerp(WHITE, 0.15 + 0.15 * sin(self.clock * 6)) end
+	local label = "THREAT  " .. plr.DisplayName
+	if t.showDistance then label = label .. "  " .. floor(target.dist) .. "m" end
+	if t.showHealth and hum and hum.MaxHealth > 0 then label = label .. "  " .. floor(clamp(hum.Health / hum.MaxHealth, 0, 1) * 100) .. "%" end
+	local width = max(180, #label * size * 0.56)
+	if t.background then
+		self.pool:rect("thr_bg", cx - width * 0.5 - 8, y - 4, width + 16, size + 9, BLACK, true, 1, t.alpha or 0.32, 90)
+		self.pool:rect("thr_bd", cx - width * 0.5 - 8, y - 4, width + 16, size + 9, col, false, 1, 0.75, 91)
+	end
+	self.pool:text("thr_txt", label, cx, y, size, col, true, FONTS.Plex, true, 92)
 end
 
 function ESP:drawFx(key, foot, mid, lod)
@@ -2884,6 +3040,7 @@ function ESP:tick(dt)
 
 	self._lastTarget = target.plr
 	if wantTarget then self:drawTarget(target, scx, scy) end
+	self:drawThreat(target)
 	self:drawList(n, target)
 	self:runModuleScreen()
 	self.pool:closeFrame()
@@ -2976,5 +3133,876 @@ function ESP:getStats()
 		target    = self._lastTarget and self._lastTarget.DisplayName or nil,
 	}
 end
+
+
+local ESP_THEMES = {
+	void = {
+		accent = rgb(190, 70, 235),
+		visible = rgb(90, 235, 130),
+		hidden = rgb(235, 70, 70),
+		text = rgb(235, 235, 245),
+		friend = rgb(80, 180, 255),
+		warning = rgb(255, 200, 80),
+	},
+	carbon = {
+		accent = rgb(110, 200, 255),
+		visible = rgb(115, 235, 160),
+		hidden = rgb(255, 100, 110),
+		text = rgb(228, 230, 235),
+		friend = rgb(120, 170, 255),
+		warning = rgb(255, 185, 80),
+	},
+	rose = {
+		accent = rgb(255, 110, 160),
+		visible = rgb(130, 225, 160),
+		hidden = rgb(255, 90, 110),
+		text = rgb(245, 228, 238),
+		friend = rgb(160, 145, 255),
+		warning = rgb(255, 190, 90),
+	},
+	ocean = {
+		accent = rgb(80, 200, 220),
+		visible = rgb(120, 225, 175),
+		hidden = rgb(255, 95, 115),
+		text = rgb(224, 235, 242),
+		friend = rgb(90, 150, 255),
+		warning = rgb(255, 200, 110),
+	},
+	solar = {
+		accent = rgb(255, 180, 70),
+		visible = rgb(145, 220, 120),
+		hidden = rgb(255, 90, 80),
+		text = rgb(245, 236, 222),
+		friend = rgb(90, 190, 255),
+		warning = rgb(255, 215, 100),
+	},
+	matrix = {
+		accent = rgb(60, 255, 130),
+		visible = rgb(90, 255, 155),
+		hidden = rgb(255, 70, 70),
+		text = rgb(205, 255, 220),
+		friend = rgb(110, 220, 255),
+		warning = rgb(255, 240, 100),
+	},
+	blood = {
+		accent = rgb(255, 45, 70),
+		visible = rgb(255, 120, 120),
+		hidden = rgb(130, 20, 30),
+		text = rgb(255, 225, 225),
+		friend = rgb(120, 140, 255),
+		warning = rgb(255, 190, 80),
+	},
+	ice = {
+		accent = rgb(150, 225, 255),
+		visible = rgb(170, 255, 230),
+		hidden = rgb(255, 110, 150),
+		text = rgb(235, 250, 255),
+		friend = rgb(90, 160, 255),
+		warning = rgb(255, 225, 130),
+	},
+	gold = {
+		accent = rgb(255, 210, 90),
+		visible = rgb(160, 230, 130),
+		hidden = rgb(255, 95, 95),
+		text = rgb(255, 242, 205),
+		friend = rgb(120, 180, 255),
+		warning = rgb(255, 180, 60),
+	},
+	mono = {
+		accent = rgb(235, 235, 235),
+		visible = rgb(210, 210, 210),
+		hidden = rgb(120, 120, 120),
+		text = rgb(245, 245, 245),
+		friend = rgb(180, 180, 180),
+		warning = rgb(225, 225, 225),
+	},
+	grape = {
+		accent = rgb(165, 95, 255),
+		visible = rgb(115, 235, 170),
+		hidden = rgb(250, 80, 120),
+		text = rgb(240, 230, 255),
+		friend = rgb(90, 180, 255),
+		warning = rgb(255, 205, 95),
+	},
+	mint = {
+		accent = rgb(90, 245, 190),
+		visible = rgb(120, 255, 170),
+		hidden = rgb(255, 100, 100),
+		text = rgb(225, 255, 245),
+		friend = rgb(120, 190, 255),
+		warning = rgb(255, 225, 120),
+	},
+}
+
+local PERF_PROFILES = {
+	potato = {
+		perf = { mode = "auto", playerCap = 8, ringDetail = 12, ballDetail = 8, fxDensity = 0.15, visPoints = 1, frameSkip = 2, pruneAfter = 120, pruneInterval = 60 },
+		glow = { on = false },
+		bones = { on = false },
+		trail = { on = false },
+		fx = { onEnemies = false },
+		radar = { maxBlips = 12 },
+		list = { max = 6 },
+	},
+	low = {
+		perf = { mode = "auto", playerCap = 16, ringDetail = 20, ballDetail = 10, fxDensity = 0.35, visPoints = 1, frameSkip = 1, pruneAfter = 180, pruneInterval = 90 },
+		glow = { on = false },
+		bones = { on = false },
+		trail = { on = false },
+		fx = { onEnemies = false },
+	},
+	balanced = {
+		perf = { mode = "auto", playerCap = 24, ringDetail = 40, ballDetail = 18, fxDensity = 0.75, visPoints = 3, frameSkip = 0, pruneAfter = 300, pruneInterval = 120 },
+	},
+	high = {
+		perf = { mode = "auto", playerCap = 0, ringDetail = 64, ballDetail = 28, fxDensity = 1, visPoints = 4, frameSkip = 0, pruneAfter = 450, pruneInterval = 120 },
+	},
+	insane = {
+		perf = { mode = "off", playerCap = 0, ringDetail = 96, ballDetail = 40, fxDensity = 1.4, visPoints = 6, frameSkip = 0, pruneAfter = 600, pruneInterval = 180 },
+		glow = { on = true },
+		bones = { on = true },
+		radar = { on = true, maxBlips = 64 },
+		list = { on = true, max = 20 },
+		target = { on = true, showFov = true },
+	},
+}
+
+function ESP:applyTheme(nameOrTheme)
+	local theme = type(nameOrTheme) == "table" and nameOrTheme or ESP_THEMES[nameOrTheme or "void"]
+	if not theme then return false end
+	local cfg = self.cfg
+	local accent = asColor(theme.accent, cfg.box.color)
+	local text = asColor(theme.text, cfg.name.color)
+	local visible = asColor(theme.visible, cfg.visible)
+	local hidden = asColor(theme.hidden, cfg.hidden)
+	local friend = asColor(theme.friend, cfg.friendColor)
+	local warning = asColor(theme.warning, cfg.threat.color)
+	cfg.visible = visible
+	cfg.hidden = hidden
+	cfg.friendColor = friend
+	cfg.box.color = accent
+	cfg.box.fillColor = accent
+	cfg.box.healthFull = visible
+	cfg.box.healthLow = hidden
+	cfg.glow.color = accent
+	cfg.name.color = text
+	cfg.gun.color = text:Lerp(accent, 0.25)
+	cfg.dist.color = text
+	cfg.hp.full = visible
+	cfg.hp.low = hidden
+	cfg.armor.color = friend
+	cfg.flags.color = text
+	cfg.bones.color = text
+	cfg.headDot.color = text
+	cfg.gaze.color = text
+	cfg.tracer.color = accent
+	cfg.arrow.color = accent
+	cfg.beacon.color = accent
+	cfg.worldLine.color = accent
+	cfg.viewCone.color = accent
+	cfg.footArrow.color = accent
+	cfg.proximity.color = accent
+	cfg.radar.enemyColor = accent
+	cfg.radar.allyColor = visible
+	cfg.radar.friendColor = friend
+	cfg.radar.borderColor = text
+	cfg.target.color = accent
+	cfg.target.friendColor = friend
+	cfg.target.allyColor = visible
+	cfg.list.color = text
+	cfg.list.enemyColor = accent
+	cfg.list.allyColor = visible
+	cfg.list.friendColor = friend
+	cfg.list.low = hidden
+	cfg.list.full = visible
+	cfg.threat.color = warning
+	cfg.hit.dmgColor = hidden
+	cfg.pulse.color = hidden
+	cfg.rings.specs[1] = cfg.rings.specs[1] or deepClone(RING_SPEC_DEFAULTS)
+	cfg.rings.specs[1].color = accent
+	cfg.ball.color = accent
+	cfg.self.trail.color = accent
+	cfg.self.cross.color = visible
+	cfg.self.fov.color = text
+	cfg.self.watermark.color = text
+	cfg.self.watermark.accent = accent
+	cfg.self.compass.color = text
+	cfg.self.compass.accent = accent
+	cfg.chams.visible = visible
+	cfg.chams.hidden = hidden
+	cfg.chams.fillColor = accent
+	cfg.chams.outlineColor = accent
+	cfg.chams.matColor = accent
+	return true
+end
+
+function ESP:themes()
+	local out = {}
+	for name in pairs(ESP_THEMES) do out[#out + 1] = name end
+	sort(out)
+	return out
+end
+
+function ESP:applyPerformance(name)
+	local profile = PERF_PROFILES[name]
+	if not profile then return false end
+	merge(self.cfg, deepClone(profile))
+	self:repairConfig()
+	return true
+end
+
+function ESP:performanceProfiles()
+	local out = {}
+	for name in pairs(PERF_PROFILES) do out[#out + 1] = name end
+	sort(out)
+	return out
+end
+
+function ESP:addInstanceEntity(id, inst, opt)
+	opt = opt or {}
+	return self:addEntity(id, {
+		get = function()
+			return inst and inst.Parent and inst or nil
+		end,
+		label = opt.label or (inst and inst.Name) or tostring(id),
+		color = opt.color or self.cfg.box.color,
+		box = opt.box ~= false,
+		name = opt.name ~= false,
+		distance = opt.distance ~= false,
+		tracer = opt.tracer == true,
+		dot = opt.dot ~= false,
+		ring = opt.ring,
+		size = opt.size,
+		maxRange = opt.maxRange or self.cfg.maxRange,
+		draw = opt.draw,
+	})
+end
+
+function ESP:clearEntities(prefix)
+	if not prefix then
+		self.entities = {}
+		return 0
+	end
+	local removed = 0
+	for id in pairs(self.entities) do
+		if tostring(id):sub(1, #prefix) == prefix then
+			self.entities[id] = nil
+			removed = removed + 1
+		end
+	end
+	return removed
+end
+
+function ESP:scanInstances(root, spec)
+	root = root or workspace
+	spec = spec or {}
+	local prefix = spec.prefix or "scan_"
+	local limit = spec.limit or 80
+	local count = 0
+	local names = spec.names
+	local classes = spec.classes
+	local color = spec.color or self.cfg.box.color
+	local function allowed(inst)
+		if names then
+			for _, n in ipairs(names) do
+				if inst.Name:lower():find(tostring(n):lower(), 1, true) then return true end
+			end
+		end
+		if classes then
+			for _, className in ipairs(classes) do
+				if inst:IsA(className) then return true end
+			end
+		end
+		return not names and not classes and (inst:IsA("BasePart") or inst:IsA("Model"))
+	end
+	for _, inst in ipairs(root:GetDescendants()) do
+		if count >= limit then break end
+		if allowed(inst) then
+			if inst:IsA("BasePart") or inst:IsA("Model") then
+				count = count + 1
+				self:addInstanceEntity(prefix .. count, inst, {
+					label = spec.label and (type(spec.label) == "function" and spec.label(inst) or spec.label) or inst.Name,
+					color = color,
+					box = spec.box ~= false,
+					name = spec.name ~= false,
+					distance = spec.distance ~= false,
+					tracer = spec.tracer == true,
+					dot = spec.dot ~= false,
+					ring = spec.ring,
+					maxRange = spec.maxRange or self.cfg.maxRange,
+				})
+			end
+		end
+	end
+	return count
+end
+
+function ESP:bind(key, fn)
+	self._binds = self._binds or {}
+	local conn = Input.InputBegan:Connect(function(input, gp)
+		if gp then return end
+		if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == key then
+			pcall(fn, self)
+		end
+	end)
+	self._binds[#self._binds + 1] = conn
+	return conn
+end
+
+function ESP:clearBinds()
+	if not self._binds then return 0 end
+	local n = 0
+	for i = #self._binds, 1, -1 do
+		local conn = self._binds[i]
+		self._binds[i] = nil
+		if conn then pcall(function() conn:Disconnect() end) end
+		n = n + 1
+	end
+	return n
+end
+
+local Toolkit = {}
+
+Toolkit.version = ESP.version
+Toolkit.themes = ESP_THEMES
+Toolkit.performance = PERF_PROFILES
+
+function Toolkit.clone(tbl)
+	return deepClone(tbl)
+end
+
+function Toolkit.merge(into, from)
+	merge(into, from)
+	return into
+end
+
+function Toolkit.fill(into, from)
+	return fillMissing(into, from)
+end
+
+function Toolkit.color(r, g, b)
+	return rgb(r or 255, g or 255, b or 255)
+end
+
+function Toolkit.hsv(h, s, v)
+	return hsv(h or 0, s or 1, v or 1)
+end
+
+function Toolkit.rainbow(t)
+	return hueAt(t or os.clock() * 0.1)
+end
+
+function Toolkit.asColor(value, fallback)
+	return asColor(value, fallback)
+end
+
+function Toolkit.clamp01(v)
+	return clamp(tonumber(v) or 0, 0, 1)
+end
+
+function Toolkit.round(v, places)
+	places = places or 0
+	local p = 10 ^ places
+	return floor((tonumber(v) or 0) * p + 0.5) / p
+end
+
+function Toolkit.map(v, a, b, c, d)
+	if b == a then return c end
+	return c + (d - c) * ((v - a) / (b - a))
+end
+
+function Toolkit.shortNumber(v)
+	v = tonumber(v) or 0
+	local av = abs(v)
+	if av >= 1000000 then return Toolkit.round(v / 1000000, 1) .. "m" end
+	if av >= 1000 then return Toolkit.round(v / 1000, 1) .. "k" end
+	return tostring(floor(v + 0.5))
+end
+
+function Toolkit.distanceLabel(v, suffix)
+	return tostring(floor((tonumber(v) or 0) + 0.5)) .. (suffix or "m")
+end
+
+function Toolkit.pathGet(tbl, path)
+	local node = tbl
+	for part in tostring(path):gmatch("[^%.]+") do
+		if type(node) ~= "table" then return nil end
+		node = node[part]
+	end
+	return node
+end
+
+function Toolkit.pathSet(tbl, path, value)
+	local node = tbl
+	local parts = {}
+	for part in tostring(path):gmatch("[^%.]+") do parts[#parts + 1] = part end
+	for i = 1, #parts - 1 do
+		local key = parts[i]
+		if type(node[key]) ~= "table" then node[key] = {} end
+		node = node[key]
+	end
+	node[parts[#parts]] = value
+	return value
+end
+
+function Toolkit.pathToggle(tbl, path)
+	local current = Toolkit.pathGet(tbl, path)
+	return Toolkit.pathSet(tbl, path, not current)
+end
+
+function Toolkit.ring(opt)
+	local spec = deepClone(RING_SPEC_DEFAULTS)
+	if opt then merge(spec, opt) end
+	return spec
+end
+
+function Toolkit.entity(inst, opt)
+	opt = opt or {}
+	return {
+		get = function()
+			return inst and inst.Parent and inst or nil
+		end,
+		label = opt.label or (inst and inst.Name) or "Entity",
+		color = opt.color or rgb(255, 255, 255),
+		box = opt.box ~= false,
+		name = opt.name ~= false,
+		distance = opt.distance == true,
+		tracer = opt.tracer == true,
+		dot = opt.dot == true,
+		ring = opt.ring,
+		size = opt.size,
+		maxRange = opt.maxRange or 3000,
+		draw = opt.draw,
+	}
+end
+
+function Toolkit.module(name, callbacks)
+	callbacks = callbacks or {}
+	return {
+		name = name,
+		enabled = callbacks.enabled == true,
+		state = callbacks.state or {},
+		setup = callbacks.setup,
+		player = callbacks.player,
+		world = callbacks.world,
+		screen = callbacks.screen,
+		teardown = callbacks.teardown,
+	}
+end
+
+function Toolkit.flag(text, color)
+	return { tostring(text), color }
+end
+
+function Toolkit.healthColor(low, full, pct)
+	return asColor(low, rgb(235, 70, 70)):Lerp(asColor(full, rgb(90, 235, 120)), clamp(pct or 0, 0, 1))
+end
+
+function Toolkit.teamColor(player, fallback)
+	return player and player.TeamColor and player.TeamColor.Color or fallback or WHITE
+end
+
+function Toolkit.isAlive(model)
+	local hum = model and model:FindFirstChildOfClass("Humanoid")
+	return hum and hum.Health > 0, hum
+end
+
+function Toolkit.rootOf(model)
+	return model and (model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart"))
+end
+
+function Toolkit.boundsOf(inst)
+	if typeof(inst) ~= "Instance" then return nil end
+	if inst:IsA("BasePart") then return inst.Position, inst.Size end
+	if inst:IsA("Model") then
+		local pivot, size = inst:GetBoundingBox()
+		return pivot.Position, size
+	end
+end
+
+function Toolkit.count(tbl)
+	local n = 0
+	for _ in pairs(tbl or {}) do n = n + 1 end
+	return n
+end
+
+function Toolkit.keys(tbl)
+	local out = {}
+	for k in pairs(tbl or {}) do out[#out + 1] = k end
+	sort(out, function(a, b) return tostring(a) < tostring(b) end)
+	return out
+end
+
+function Toolkit.values(tbl)
+	local out = {}
+	for _, v in pairs(tbl or {}) do out[#out + 1] = v end
+	return out
+end
+
+function Toolkit.findPlayer(query)
+	query = tostring(query or ""):lower()
+	for _, plr in ipairs(Players:GetPlayers()) do
+		if plr.Name:lower():find(query, 1, true) or plr.DisplayName:lower():find(query, 1, true) then
+			return plr
+		end
+	end
+end
+
+function Toolkit.playerDistance(a, b)
+	local ca = typeof(a) == "Instance" and a.Character or a
+	local cb = typeof(b) == "Instance" and b.Character or b
+	local ra = Toolkit.rootOf(ca)
+	local rb = Toolkit.rootOf(cb)
+	if ra and rb then return (ra.Position - rb.Position).Magnitude end
+end
+
+function Toolkit.scan(root, predicate, limit)
+	root = root or workspace
+	limit = limit or 100
+	local out = {}
+	for _, inst in ipairs(root:GetDescendants()) do
+		if #out >= limit then break end
+		local ok, yes = pcall(predicate, inst)
+		if ok and yes then out[#out + 1] = inst end
+	end
+	return out
+end
+
+function Toolkit.scanNames(root, names, limit)
+	local lowered = {}
+	for _, name in ipairs(names or {}) do lowered[#lowered + 1] = tostring(name):lower() end
+	return Toolkit.scan(root, function(inst)
+		local n = inst.Name:lower()
+		for _, needle in ipairs(lowered) do
+			if n:find(needle, 1, true) then return true end
+		end
+		return false
+	end, limit)
+end
+
+function Toolkit.scanClasses(root, classes, limit)
+	return Toolkit.scan(root, function(inst)
+		for _, className in ipairs(classes or {}) do
+			if inst:IsA(className) then return true end
+		end
+		return false
+	end, limit)
+end
+
+function Toolkit.boxCorners(center, size)
+	local half = size * 0.5
+	local out = {}
+	for i = 1, 8 do out[i] = center + CORNERS[i] * half end
+	return out
+end
+
+function Toolkit.applyTheme(esp, theme)
+	return esp:applyTheme(theme)
+end
+
+function Toolkit.applyPerformance(esp, profile)
+	return esp:applyPerformance(profile)
+end
+
+function Toolkit.quickESP(opt)
+	opt = opt or {}
+	local esp = ESP.new(opt)
+	esp.cfg.enabled = opt.enabled ~= false
+	if opt.theme then esp:applyTheme(opt.theme) end
+	if opt.performance then esp:applyPerformance(opt.performance) end
+	return esp:start()
+end
+
+function Toolkit.safeDestroy(obj)
+	if obj then pcall(function() obj:Destroy() end) end
+end
+
+function Toolkit.bind(key, fn)
+	return Input.InputBegan:Connect(function(input, gp)
+		if not gp and input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == key then
+			pcall(fn)
+		end
+	end)
+end
+
+function Toolkit.every(seconds, fn)
+	local alive = true
+	task.spawn(function()
+		while alive do
+			pcall(fn)
+			task.wait(seconds)
+		end
+	end)
+	return function() alive = false end
+end
+
+function Toolkit.once(signal, fn)
+	local conn
+	conn = signal:Connect(function(...)
+		if conn then conn:Disconnect() end
+		pcall(fn, ...)
+	end)
+	return conn
+end
+
+function Toolkit.makeFlagProvider(name, fn)
+	return name, fn
+end
+
+function Toolkit.defaultConfig()
+	return baseConfig()
+end
+
+function Toolkit.palette()
+	return palette()
+end
+
+function Toolkit.presets()
+	local out = {}
+	for k in pairs(PRESETS) do out[#out + 1] = k end
+	sort(out)
+	return out
+end
+
+function Toolkit.themeNames()
+	local out = {}
+	for k in pairs(ESP_THEMES) do out[#out + 1] = k end
+	sort(out)
+	return out
+end
+
+function Toolkit.performanceNames()
+	local out = {}
+	for k in pairs(PERF_PROFILES) do out[#out + 1] = k end
+	sort(out)
+	return out
+end
+
+function Toolkit.inspectStats(esp)
+	local s = esp:getStats()
+	return "drawn=" .. tostring(s.drawn) .. " pool=" .. tostring(s.poolSize) .. " fps=" .. tostring(s.fps) .. " roster=" .. tostring(s.roster)
+end
+
+function Toolkit.installDefaultFlags(esp)
+	esp:addFlag("team", function(ctx)
+		return ctx.plr.Team and Toolkit.flag(ctx.plr.Team.Name, Toolkit.teamColor(ctx.plr, esp.cfg.flags.color)) or nil
+	end)
+	esp:addFlag("low", function(ctx)
+		local hum = ctx.hum
+		if hum and hum.MaxHealth > 0 and hum.Health / hum.MaxHealth < 0.25 then
+			return Toolkit.flag("LOW", esp.cfg.hp.low)
+		end
+	end)
+	esp:addFlag("dist", function(ctx)
+		return Toolkit.flag(floor(ctx.dist) .. "m", esp.cfg.dist.color)
+	end)
+end
+
+function Toolkit.installThreatModule(esp)
+	esp:register({
+		name = "toolkit_threat_cross",
+		enabled = true,
+		player = function(state, ctx)
+			if ctx.visible == false then return end
+			local x = ctx.x + ctx.w * 0.5
+			local y = ctx.y + ctx.h * 0.5
+			ctx.esp.pool:line(ctx.key .. "tkx1", x - 5, y - 5, x + 5, y + 5, ctx.accent, 1, 0.75)
+			ctx.esp.pool:line(ctx.key .. "tkx2", x + 5, y - 5, x - 5, y + 5, ctx.accent, 1, 0.75)
+		end,
+	})
+end
+
+
+local FEATURE_PACKS = {
+	competitive = {
+		box = { on = true, style = "corner", outline = true, fill = false, colorMode = "health" },
+		name = { on = true, user = false },
+		hp = { on = true, showPercent = false },
+		dist = { on = true },
+		flags = { on = true },
+		tracer = { on = false },
+		arrow = { on = true, filled = true, distance = true },
+		target = { on = true, showFov = true, visibleOnly = true, snapline = false },
+		radar = { on = true },
+		list = { on = true, max = 8 },
+	},
+	cinematic = {
+		box = { on = true, style = "3dcorner", fill = true, fillAlpha = 0.08 },
+		glow = { on = true, layers = 5, spread = 3 },
+		bones = { on = true },
+		beacon = { on = true, label = true },
+		viewCone = { on = true },
+		footArrow = { on = true },
+		proximity = { on = true },
+		rings = { on = true, onEnemies = true },
+		ball = { on = true, onEnemies = true, fx = "rainbow" },
+		self = { fov = { on = true }, cross = { on = true }, compass = { on = true }, watermark = { on = true } },
+	},
+	world = {
+		beacon = { on = true },
+		worldLine = { on = true },
+		viewCone = { on = true },
+		footArrow = { on = true },
+		proximity = { on = true },
+		radar = { on = true },
+		list = { on = true },
+	},
+	stealth = {
+		box = { on = true, style = "corner", fill = false },
+		glow = { on = false },
+		bones = { on = false },
+		tracer = { on = false },
+		arrow = { on = false },
+		beacon = { on = false },
+		worldLine = { on = false },
+		viewCone = { on = false },
+		footArrow = { on = false },
+		proximity = { on = false },
+		fx = { onEnemies = false },
+		radar = { on = false },
+		list = { on = false },
+	},
+	streamer = {
+		name = { on = true, user = false },
+		dist = { on = true },
+		flags = { on = false },
+		list = { on = false },
+		radar = { on = false },
+		self = { watermark = { on = false } },
+	},
+}
+
+function ESP:applyFeaturePack(name)
+	local pack = FEATURE_PACKS[name]
+	if not pack then return false end
+	merge(self.cfg, deepClone(pack))
+	self:repairConfig()
+	return true
+end
+
+function ESP:featurePacks()
+	local out = {}
+	for name in pairs(FEATURE_PACKS) do out[#out + 1] = name end
+	sort(out)
+	return out
+end
+
+function ESP:scanNPCs(opt)
+	opt = opt or {}
+	local prefix = opt.prefix or "npc_"
+	if opt.clear ~= false then self:clearEntities(prefix) end
+	local count = 0
+	local root = opt.root or workspace
+	local limit = opt.limit or 40
+	for _, model in ipairs(root:GetDescendants()) do
+		if count >= limit then break end
+		if model:IsA("Model") and model:FindFirstChildOfClass("Humanoid") and not Players:GetPlayerFromCharacter(model) then
+			local base = Toolkit.rootOf(model)
+			if base then
+				count = count + 1
+				local id = prefix .. count
+				self:addInstanceEntity(id, model, {
+					label = opt.label and (type(opt.label) == "function" and opt.label(model) or opt.label) or ("NPC: " .. model.Name),
+					color = opt.color or rgb(255, 120, 120),
+					box = opt.box ~= false,
+					name = opt.name ~= false,
+					distance = opt.distance ~= false,
+					tracer = opt.tracer == true,
+					dot = opt.dot ~= false,
+					ring = opt.ring,
+					maxRange = opt.maxRange or self.cfg.maxRange,
+				})
+			end
+		end
+	end
+	return count
+end
+
+function ESP:scanTools(opt)
+	opt = opt or {}
+	local prefix = opt.prefix or "tool_"
+	if opt.clear ~= false then self:clearEntities(prefix) end
+	local count = 0
+	local root = opt.root or workspace
+	local limit = opt.limit or 60
+	for _, tool in ipairs(root:GetDescendants()) do
+		if count >= limit then break end
+		if tool:IsA("Tool") then
+			local handle = tool:FindFirstChild("Handle") or tool:FindFirstChildWhichIsA("BasePart")
+			if handle then
+				count = count + 1
+				self:addInstanceEntity(prefix .. count, handle, {
+					label = opt.label and (type(opt.label) == "function" and opt.label(tool) or opt.label) or ("Tool: " .. tool.Name),
+					color = opt.color or rgb(255, 210, 90),
+					box = opt.box ~= false,
+					name = opt.name ~= false,
+					distance = opt.distance ~= false,
+					tracer = opt.tracer == true,
+					dot = opt.dot ~= false,
+					ring = opt.ring,
+					maxRange = opt.maxRange or self.cfg.maxRange,
+				})
+			end
+		end
+	end
+	return count
+end
+
+function ESP:scanPickups(opt)
+	opt = opt or {}
+	local prefix = opt.prefix or "pickup_"
+	if opt.clear ~= false then self:clearEntities(prefix) end
+	local names = opt.names or { "ammo", "coin", "cash", "drop", "pickup", "weapon", "med", "armor" }
+	return self:scanInstances(opt.root or workspace, {
+		prefix = prefix,
+		limit = opt.limit or 80,
+		names = names,
+		color = opt.color or rgb(120, 255, 190),
+		box = opt.box ~= false,
+		name = opt.name ~= false,
+		distance = opt.distance ~= false,
+		tracer = opt.tracer == true,
+		dot = opt.dot ~= false,
+		ring = opt.ring,
+		maxRange = opt.maxRange or self.cfg.maxRange,
+	})
+end
+
+function Toolkit.featurePacks()
+	local out = {}
+	for name in pairs(FEATURE_PACKS) do out[#out + 1] = name end
+	sort(out)
+	return out
+end
+
+function Toolkit.applyFeaturePack(esp, name)
+	return esp:applyFeaturePack(name)
+end
+
+function Toolkit.showcase(esp)
+	esp:applyTheme("grape")
+	esp:applyPerformance("high")
+	esp:applyFeaturePack("cinematic")
+esp.cfg.enabled = true
+	return esp
+end
+
+function Toolkit.competitive(esp)
+	esp:applyTheme("carbon")
+	esp:applyPerformance("balanced")
+	esp:applyFeaturePack("competitive")
+esp.cfg.enabled = true
+	return esp
+end
+
+function Toolkit.potassiumSafe(esp)
+	esp:applyPerformance("low")
+esp.cfg.perf.pruneAfter = 180
+	esp.cfg.perf.pruneInterval = 90
+	esp.cfg.perf.dropFxFar = true
+	return esp
+end
+
+ESP.Toolkit = Toolkit
 
 return ESP
